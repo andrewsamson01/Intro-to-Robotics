@@ -2,7 +2,7 @@
    ms 20200926
 */
 // Include Libraries
-#include <PinChangeInt.h>
+#include <PinChangeInterrupt.h>
 
 // Driver definitions
 
@@ -34,8 +34,8 @@
  */
 
 // Drive constants - dependent on robot configuration
-#define EncoderCountsPerRev 12.0
-#define DistancePerRev      22.3
+#define EncoderCountsPerRev 24*3
+#define DistancePerRev      25.1
 #define DegreesPerRev       22.3
 
 //These are to build your moves array, a la Lab 2
@@ -59,15 +59,15 @@
 // minimum power settings
 // Equal to the min PWM for your robot's wheels to move
 // May be different per motor
-#define deadband_A 20
-#define deadband_B 20
+#define deadband_A 150
+#define deadband_B 150
 
 
 // Lab specific variables
 volatile unsigned int leftEncoderCount = 0;
 volatile unsigned int rightEncoderCount = 0;
-int moves[] = {FORWARD, LEFT, FORWARD, LEFT, FORWARD, RIGHT, FORWARD, FORWARD, FORWARD, RIGHT, FORWARD, FORWARD, RIGHT, FORWARD}; // Fill in this array will forward distances and turn directions in the maze (a la Lab 2)
-
+//int moves[] = {FORWARD, LEFT, FORWARD, LEFT, FORWARD, RIGHT, FORWARD, FORWARD, FORWARD, RIGHT, FORWARD, FORWARD, RIGHT, FORWARD}; // Fill in this array will forward distances and turn directions in the maze (a la Lab 2)
+int moves[] = {FORWARD, FORWARD, FORWARD};
 void setup() {
   // set stuff up
   Serial.begin(9600);
@@ -75,6 +75,7 @@ void setup() {
   pinMode(pushButton, INPUT_PULLUP);
   
   // add additional pinMode statements for any bump sensors
+  pinMode(5, OUTPUT);
   
 
   // Attaching Wheel Encoder Interrupts
@@ -84,23 +85,32 @@ void setup() {
   Serial.println();
   pinMode(EncoderMotorLeft, INPUT_PULLUP); //set the pin to input
   // this next line setup the PinChange Interrupt
-  PCintPort::attachInterrupt(EncoderMotorLeft, indexLeftEncoderCount, CHANGE);
+  attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(EncoderMotorLeft), indexLeftEncoderCount, CHANGE);
   // if you "really" want to know what's going on read the PinChange.h file :)
   /////////////////////////////////////////////////
   Serial.print("Now setting up the Right Encoder: Pin ");
   Serial.print(EncoderMotorRight);
   Serial.println();
   pinMode(EncoderMotorRight, INPUT_PULLUP);     //set the pin to input
-  PCintPort::attachInterrupt(EncoderMotorRight, indexRightEncoderCount, CHANGE);
+  attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(EncoderMotorRight), indexRightEncoderCount, CHANGE);
 } /////////////// end of setup ////////////////////////////////////
 
 /////////////////////// loop() ////////////////////////////////////
 void loop()
 {
-
-  while (digitalRead(pushButton) == 1); // wait for button push
+  digitalWrite(5, HIGH);
+//  while(true){
+//    if (digitalRead(pushButton) != 1){ // wait for button push
+//      run_motor(A, 200);
+//      run_motor(B, 200);
+//    }else{
+//      run_motor(A, 0);
+//      run_motor(B, 0);
+//    }
+//  }expGain -
+  while (digitalRead(pushButton) == 1);
   while (digitalRead(pushButton) == 0); // wait for button release
-  for (int i = 0; i < sizeof(moves); i++) { // Loop through entire moves list
+  for (int i = 0; i < sizeof(moves)/sizeof(moves[0]); i++) { // Loop through entire moves list
     if(moves[i]==LEFT){
       // Fill with code to turn left
     }
@@ -109,8 +119,8 @@ void loop()
     }
     else{
       // Fill with code to drive forward
-      distance = 30 // Need to change this to whatever the correct distance is
-      drive(distance)
+      int distance = 30; // Need to change this to whatever the correct distance is
+      drive(distance);
     }
     run_motor(A, 0);
     run_motor(B, 0);
@@ -141,18 +151,29 @@ int drive(float distance)
   // Begin PID control until move is complete
   while (errorLeft > distTolerance || errorRight > distTolerance)
   {
+    //noInterrupts();
+    double expGain = 10;
+    int diff = leftEncoderCount - rightEncoderCount;
+    Serial.print("Left\t");
+    Serial.print(leftEncoderCount); 
+    Serial.print("\t\tRight\t");
+    Serial.println(rightEncoderCount);
+    Serial.print("\t   ");
+    
+    Serial.println((diff));
     // according to the PID formula, what should the current PWMs be?
-    cmdLeft = 240 * rightEncoderCount / leftEncoderCount * errorLeft;
-    cmdRight = 240 * errorRight;
-
+    
+    cmdLeft = computeCommand(GAIN_A, deadband_A, errorLeft);
+    cmdRight = computeCommand(GAIN_B, deadband_B, errorRight) * abs(expGain - (diff))/ expGain;
+    //interrupts();
     // Set new PWMs
     run_motor(A, cmdLeft);
     run_motor(B, cmdRight);
 
     // Update encoder error
-    errorLeft = (countsDesired - leftEncoderCount) / countsDesired;
-    errorRight = (countsDesired - rightEncoderCount) / countsDesired;;
-
+    errorLeft = (countsDesired - leftEncoderCount);
+    errorRight = (countsDesired - rightEncoderCount) ;
+    //Serial.println(errorLeft);
     // If using bump sensors, check here for collisions
     // and call correction function
 
@@ -191,7 +212,7 @@ int computeCommand(int gain, int deadband, int error)
   }
 
   int cmdDir = (gain * error); // Proportional control
-  cmdDir = constrain(cmdDir,deadband,255); // Bind value between motor's min and max
+  cmdDir = constrain(cmdDir,deadband,240); // Bind value between motor's min and max
   return(cmdDir);
 }
 
@@ -203,9 +224,11 @@ int computeCommand(int gain, int deadband, int error)
 void indexLeftEncoderCount()
 {
   leftEncoderCount++;
+
 }
 //////////////////////////////////////////////////////////
 void indexRightEncoderCount()
 {
   rightEncoderCount++;
+    
 }
