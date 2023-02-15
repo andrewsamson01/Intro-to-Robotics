@@ -100,7 +100,7 @@ void loop()
 
   while (digitalRead(pushButton) == 1); // wait for button push
   while (digitalRead(pushButton) == 0); // wait for button release
-  for (int i = 0; i < sizeof(moves)/2; i++) { // Loop through entire moves list
+  for (int i = 0; i < sizeof(moves); i++) { // Loop through entire moves list
     if(moves[i]==LEFT){
       // Fill with code to turn left
     }
@@ -128,7 +128,7 @@ int drive(float distance)
 
   // Find the number of encoder counts based on the distance given, and the 
   // configuration of your encoders and wheels
-  countsDesired = ;
+  countsDesired = EncoderCountsPerRev / DistancePerRev * distance;
 
   // reset the current encoder counts
   leftEncoderCount = 0;
@@ -150,8 +150,8 @@ int drive(float distance)
     run_motor(B, cmdRight);
 
     // Update encoder error
-    errorLeft = ;
-    errorRight = ;
+    errorLeft = (countsDesired - leftEncoderCount) / countsDesired;
+    errorRight = (countsDesired - rightEncoderCount) / countsDesired;;
 
     // If using bump sensors, check here for collisions
     // and call correction function
