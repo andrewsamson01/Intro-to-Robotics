@@ -68,6 +68,20 @@ bool bump = false;
 // Lab specific variables
 volatile unsigned int leftEncoderCount = 0;
 volatile unsigned int rightEncoderCount = 0;
+// struct wheel{
+//   wheel(int pin, void function){
+//     pinMode(pin, INPUT_PULLUP); //set the pin to input
+//     attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(pin), *function, CHANGE);
+//   }
+//   double displacement(){
+//     double tbr =(count - last_count) / EncoderCountsPerRev * DistancePerRev;
+//     last_count = count;  
+//   }
+//   long int count = 0;
+//   int direct = 1;
+//   int last_count = 0;
+
+// };
 int moves[] = {FORWARD, LEFT, FORWARD, LEFT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD}; // Fill in this array will forward distances and turn directions in the maze (a la Lab 2)
 //int moves[] = {FORWARD};
 //int moves[] = {LEFT};
