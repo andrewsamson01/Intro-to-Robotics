@@ -34,7 +34,7 @@
  */
 
 // Drive constants - dependent on robot configuration
-#define EncoderCountsPerRev 24*3
+#define EncoderCountsPerRev 38.4
 #define DistancePerRev      25.1
 #define DegreesPerRev       22.3
 
@@ -48,26 +48,29 @@
 // You may change these as you see fit.
 #define EncoderMotorLeft  7
 #define EncoderMotorRight 8
+#define Bumper 9
 
 // Proportional Control constants
 // what are your ratios of PWM:Encoder Count error?
-#define GAIN_A 5
-#define GAIN_B 5
+#define GAIN_A 3
+#define GAIN_B 3
 // how many encoder counts from your goal are accepteable?
 #define distTolerance 3 
 
 // minimum power settings
 // Equal to the min PWM for your robot's wheels to move
 // May be different per motor
-#define deadband_A 150
-#define deadband_B 150
+#define deadband_A 140
+#define deadband_B 140
+bool bump = false;
 
 
 // Lab specific variables
 volatile unsigned int leftEncoderCount = 0;
 volatile unsigned int rightEncoderCount = 0;
-//int moves[] = {FORWARD, LEFT, FORWARD, LEFT, FORWARD, RIGHT, FORWARD, FORWARD, FORWARD, RIGHT, FORWARD, FORWARD, RIGHT, FORWARD}; // Fill in this array will forward distances and turn directions in the maze (a la Lab 2)
-int moves[] = {FORWARD, FORWARD, FORWARD};
+int moves[] = {FORWARD, LEFT, FORWARD, LEFT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD}; // Fill in this array will forward distances and turn directions in the maze (a la Lab 2)
+//int moves[] = {FORWARD};
+//int moves[] = {LEFT};
 void setup() {
   // set stuff up
   Serial.begin(9600);
@@ -76,6 +79,15 @@ void setup() {
   
   // add additional pinMode statements for any bump sensors
   pinMode(5, OUTPUT);
+  digitalWrite(5, HIGH);
+  pinMode(10, OUTPUT);
+  digitalWrite(10, LOW);
+  
+  Serial.print("Now setting up the Bumper: Pin ");
+  Serial.print(Bumper);
+  Serial.println();
+  pinMode(Bumper, INPUT_PULLUP);     //set the pin to input
+  attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(Bumper), bumperContact, CHANGE);
   
 
   // Attaching Wheel Encoder Interrupts
@@ -93,34 +105,46 @@ void setup() {
   Serial.println();
   pinMode(EncoderMotorRight, INPUT_PULLUP);     //set the pin to input
   attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(EncoderMotorRight), indexRightEncoderCount, CHANGE);
+
+  
 } /////////////// end of setup ////////////////////////////////////
 
 /////////////////////// loop() ////////////////////////////////////
 void loop()
 {
-  digitalWrite(5, HIGH);
+  
 //  while(true){
+//    Serial.print("Left\t");
+//    Serial.print(leftEncoderCount);
+//    Serial.print("\tRight\t");
+//    Serial.println(rightEncoderCount); 
+//  
 //    if (digitalRead(pushButton) != 1){ // wait for button push
 //      run_motor(A, 200);
 //      run_motor(B, 200);
+//      
 //    }else{
 //      run_motor(A, 0);
 //      run_motor(B, 0);
 //    }
-//  }expGain -
+//  }
+int j = 0;
   while (digitalRead(pushButton) == 1);
   while (digitalRead(pushButton) == 0); // wait for button release
   for (int i = 0; i < sizeof(moves)/sizeof(moves[0]); i++) { // Loop through entire moves list
+    double tur = 10.9; //5*PI/2
     if(moves[i]==LEFT){
-      // Fill with code to turn left
+      drive(tur,-1,1);
     }
     else if(moves[i]==RIGHT){
-      // Fill with code to turn right
+      drive(tur,1,-1);
     }
     else{
       // Fill with code to drive forward
-      int distance = 30; // Need to change this to whatever the correct distance is
-      drive(distance);
+      double vals[] = {1.0, 1.0, 0.95, 3.0, 2.0, 1.0};
+      double distance = 27 * vals[j]; // Need to change this to whatever the correct distance is
+      drive(distance,1,1);
+      j++;
     }
     run_motor(A, 0);
     run_motor(B, 0);
@@ -131,10 +155,12 @@ void loop()
 
 
 ////////////////////////////////////////////////////////////////////////////////
-int drive(float distance)
+
+int drive(float distance, int ldir, int rdir)
 {
   // create variables needed for this function
   int countsDesired, cmdLeft, cmdRight, errorLeft, errorRight;
+  countsDesired = EncoderCountsPerRev / DistancePerRev * distance;
 
   // Find the number of encoder counts based on the distance given, and the 
   // configuration of your encoders and wheels
@@ -152,7 +178,16 @@ int drive(float distance)
   while (errorLeft > distTolerance || errorRight > distTolerance)
   {
     //noInterrupts();
-    double expGain = 10.0;
+    if (bump) {
+      bump = false;
+      unsigned int encoders[] = {leftEncoderCount, rightEncoderCount};
+      drive(5, -1, -1);
+      drive(3, 1, -1);
+      drive(5, 1, 1);
+      leftEncoderCount = encoders[0];
+      rightEncoderCount = encoders[1];
+    }
+    double expGain = 9.0;
     int diff = rightEncoderCount - leftEncoderCount;
     Serial.print("Left\t");
     Serial.print(leftEncoderCount); 
@@ -164,15 +199,15 @@ int drive(float distance)
     // according to the PID formula, what should the current PWMs be?
     
     cmdLeft = computeCommand(GAIN_A, deadband_A, errorLeft);
-    cmdRight = computeCommand(GAIN_B, deadband_B, errorRight) * abs(expGain - (diff))/ expGain;
+    cmdRight = computeCommand(GAIN_B, deadband_B, errorRight)* abs(expGain - diff)/ expGain;
     //interrupts();
     // Set new PWMs
-    run_motor(A, cmdLeft);
-    run_motor(B, cmdRight);
+    run_motor(A, cmdLeft * ldir);
+    run_motor(B, cmdRight * rdir);
 
     // Update encoder error
-    errorLeft = (countsDesired - leftEncoderCount);
-    errorRight = (countsDesired - rightEncoderCount) ;
+    errorLeft = abs(countsDesired - leftEncoderCount);
+    errorRight = abs(countsDesired - rightEncoderCount) ;
     //Serial.println(errorLeft);
     // If using bump sensors, check here for collisions
     // and call correction function
@@ -212,7 +247,7 @@ int computeCommand(int gain, int deadband, int error)
   }
 
   int cmdDir = (gain * error); // Proportional control
-  cmdDir = constrain(cmdDir,deadband,240); // Bind value between motor's min and max
+  cmdDir = constrain(cmdDir,deadband,220); // Bind value between motor's min and max
   return(cmdDir);
 }
 
@@ -224,11 +259,16 @@ int computeCommand(int gain, int deadband, int error)
 void indexLeftEncoderCount()
 {
   leftEncoderCount++;
-
+  
 }
 //////////////////////////////////////////////////////////
 void indexRightEncoderCount()
 {
   rightEncoderCount++;
-    
+}
+///////////////////////////////////////////////////////////
+void bumperContact(){
+  if (!digitalRead(Bumper)) {
+    bump = true;
+  }
 }
