@@ -152,8 +152,8 @@ int drive(float distance)
   while (errorLeft > distTolerance || errorRight > distTolerance)
   {
     //noInterrupts();
-    double expGain = 10;
-    int diff = leftEncoderCount - rightEncoderCount;
+    double expGain = 10.0;
+    int diff = rightEncoderCount - leftEncoderCount;
     Serial.print("Left\t");
     Serial.print(leftEncoderCount); 
     Serial.print("\t\tRight\t");
