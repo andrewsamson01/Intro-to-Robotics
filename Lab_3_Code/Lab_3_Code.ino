@@ -64,37 +64,47 @@
 #define deadband_B 140
 bool bump = false;
 
-
+//pos
+double x = 0;
+double y = 0;
+double phi = 0;
 // Lab specific variables
-volatile unsigned int leftEncoderCount = 0;
-volatile unsigned int rightEncoderCount = 0;
-// class wheel{
-//   public:
-//   wheel::wheel(int pin, void (*function)){
-//     pinMode(pin, INPUT_PULLUP); //set the pin to input
-//     //attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(pin), function, CHANGE);
-//   }
-//   double displacement(){
-//     double tbr =(count - last_count) / EncoderCountsPerRev * DistancePerRev;
-//     last_count = count;  
-//   }
-//   void changeCount() {
-//     if (direct > 0) {
-//       count++;
-//     } else {
-//       count--;
-//     }
-//   }
-//   long int count = 0;
-//   int direct = 1;
-//   int last_count = 0;
 
-//   private:
-// };
+class wheel{
+  public:
+  wheel(int pin, void (*function)){
+    pinMode(pin, INPUT_PULLUP); //set the pin to input
+    attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(pin), function, CHANGE);
+    Serial.println("Here");
+  }
+  double displacement(){
+    double tbr =(count - last_count) / EncoderCountsPerRev * DistancePerRev;
+    last_count = count;  
+  }
+  void changeCount() {
+    if (direct > 0) {
+      count++;
+    } else {
+      count--;
+    }
 
-// void indexRightEncoderCount();
+  }
+  void countDesiredUpdate(int distance) {
+    countsDesired = (EncoderCountsPerRev / DistancePerRev * distance)*direct + count;
+  }
+  long int count = 0;
+  int direct = 1;
+  int last_count = 0;
+  int countsDesired = 0;
 
-// wheel right(3, indexRightEncoderCount);
+  private:
+};
+
+void indexRightEncoderCount();
+void indexLeftEncoderCount();
+
+wheel right(51, indexRightEncoderCount);
+wheel left(50, indexLeftEncoderCount);
 int moves[] = {FORWARD, LEFT, FORWARD, LEFT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD}; // Fill in this array will forward distances and turn directions in the maze (a la Lab 2)
 //int moves[] = {FORWARD};
 //int moves[] = {LEFT};
@@ -118,20 +128,20 @@ void setup() {
   
 
   // Attaching Wheel Encoder Interrupts
-  Serial.print("Encoder Testing Program ");
-  Serial.print("Now setting up the Left Encoder: Pin ");
-  Serial.print(EncoderMotorLeft);
-  Serial.println();
-  pinMode(EncoderMotorLeft, INPUT_PULLUP); //set the pin to input
-  // this next line setup the PinChange Interrupt
-  attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(EncoderMotorLeft), indexLeftEncoderCount, CHANGE);
+  // Serial.print("Encoder Testing Program ");
+  // Serial.print("Now setting up the Left Encoder: Pin ");
+  // Serial.print(EncoderMotorLeft);
+  // Serial.println();
+  // pinMode(EncoderMotorLeft, INPUT_PULLUP); //set the pin to input
+  // // this next line setup the PinChange Interrupt
+  // attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(EncoderMotorLeft), indexLeftEncoderCount, CHANGE);
   // if you "really" want to know what's going on read the PinChange.h file :)
   /////////////////////////////////////////////////
-  Serial.print("Now setting up the Right Encoder: Pin ");
-  Serial.print(EncoderMotorRight);
-  Serial.println();
-  pinMode(EncoderMotorRight, INPUT_PULLUP);     //set the pin to input
-  attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(EncoderMotorRight), indexRightEncoderCount, CHANGE);
+  // Serial.print("Now setting up the Right Encoder: Pin ");
+  // Serial.print(EncoderMotorRight);
+  // Serial.println();
+  // pinMode(EncoderMotorRight, INPUT_PULLUP);     //set the pin to input
+  // attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(EncoderMotorRight), indexRightEncoderCount, CHANGE);
 
   
 } /////////////// end of setup ////////////////////////////////////
@@ -140,24 +150,9 @@ void setup() {
 void loop()
 {
   
-//  while(true){
-//    Serial.print("Left\t");
-//    Serial.print(leftEncoderCount);
-//    Serial.print("\tRight\t");
-//    Serial.println(rightEncoderCount); 
-//  
-//    if (digitalRead(pushButton) != 1){ // wait for button push
-//      run_motor(A, 200);
-//      run_motor(B, 200);
-//      
-//    }else{
-//      run_motor(A, 0);
-//      run_motor(B, 0);
-//    }
-//  }
 int j = 0;
-  while (digitalRead(pushButton) == 1);
-  while (digitalRead(pushButton) == 0); // wait for button release
+  // while (digitalRead(pushButton) == 1);
+  // while (digitalRead(pushButton) == 0); // wait for button release
   for (int i = 0; i < sizeof(moves)/sizeof(moves[0]); i++) { // Loop through entire moves list
     double tur = 10.9; //5*PI/2
     if(moves[i]==LEFT){
@@ -185,17 +180,18 @@ int j = 0;
 
 int drive(float distance, int ldir, int rdir)
 {
+  right.direct = rdir;
+  left.direct = ldir;
+  right.countDesiredUpdate(distance);
+  left.countDesiredUpdate(distance);
   // create variables needed for this function
-  int countsDesired, cmdLeft, cmdRight, errorLeft, errorRight;
-  countsDesired = EncoderCountsPerRev / DistancePerRev * distance;
+  int cmdLeft, cmdRight, errorLeft, errorRight;
+  
 
   // Find the number of encoder counts based on the distance given, and the 
   // configuration of your encoders and wheels
-  countsDesired = EncoderCountsPerRev / DistancePerRev * distance;
 
-  // reset the current encoder counts
-  leftEncoderCount = 0;
-  rightEncoderCount = 0;
+
   
   // we make the errors greater than our tolerance so our first test gets us into the loop
   errorLeft = distTolerance + 1;
@@ -207,20 +203,16 @@ int drive(float distance, int ldir, int rdir)
     //noInterrupts();
     if (bump) {
       bump = false;
-      unsigned int encoders[] = {leftEncoderCount, rightEncoderCount};
+      unsigned int encoders[] = {left.count, right.count};
       drive(5, -1, -1);
       drive(3, 1, -1);
       drive(5, 1, 1);
-      leftEncoderCount = encoders[0];
-      rightEncoderCount = encoders[1];
+      left.count = encoders[0];
+      right.count = encoders[1];
     }
     double expGain = 9.0;
-    int diff = rightEncoderCount - leftEncoderCount;
-    Serial.print("Left\t");
-    Serial.print(leftEncoderCount); 
-    Serial.print("\t\tRight\t");
-    Serial.println(rightEncoderCount);
-    Serial.print("\t   ");
+    int diff = errorRight - errorLeft;
+    update_position();
     
     Serial.println((diff));
     // according to the PID formula, what should the current PWMs be?
@@ -233,20 +225,10 @@ int drive(float distance, int ldir, int rdir)
     run_motor(B, cmdRight * rdir);
 
     // Update encoder error
-    errorLeft = abs(countsDesired - leftEncoderCount);
-    errorRight = abs(countsDesired - rightEncoderCount) ;
-    //Serial.println(errorLeft);
-    // If using bump sensors, check here for collisions
-    // and call correction function
-
-    /* Some print statements, for debugging
     Serial.print(errorLeft);
-    Serial.print(" ");
-    Serial.print(cmdLeft);
-    Serial.print("\t");
-    Serial.print(errorRight);
-    Serial.print(" ");
-    Serial.println(cmdRight);*/
+
+    errorLeft = abs(left.countsDesired - left.count);
+    errorRight = abs(right.countsDesired - right.count) ;
 
   }
 
@@ -285,17 +267,45 @@ int computeCommand(int gain, int deadband, int error)
 
 void indexLeftEncoderCount()
 {
-  leftEncoderCount++;
+  left.changeCount();
   
 }
 //////////////////////////////////////////////////////////
 void indexRightEncoderCount()
 {
-  rightEncoderCount++;
+  //rightEncoderCount++;
+  right.changeCount();
 }
 ///////////////////////////////////////////////////////////
 void bumperContact(){
   if (!digitalRead(Bumper)) {
     bump = true;
   }
+}
+
+void update_position(){ //Updates position for localization
+  double d_r = right.displacement(); //sets a constant position throughout function
+  double d_l = left.displacement();
+
+  double xOld = x;
+  double yOld = y;
+  x = cos(phi)*(d_r + d_l) / 2; //updates x postion
+  y = sin(phi)*(d_r + d_l) / 2; //updates y position
+   
+  phi = (right.count - left.count) * 2.0*PI /EncoderCountsPerRev * 8 / 19; //updates orientation
+  x = x + xOld;
+  y = y + yOld;
+
+  Serial.print("Left\t");
+    Serial.print(left.count); 
+    Serial.print("\t\tRight\t");
+    Serial.print(right.count);
+    Serial.print("\t   ");
+  Serial.print(phi);
+  Serial.print('\t');
+  Serial.print(x);
+  Serial.print('\t');
+  Serial.println(y);
+
+
 }
