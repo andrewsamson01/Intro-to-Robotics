@@ -1,3 +1,4 @@
+
 /* a closed loop proportional control
    ms 20200926
 */
@@ -55,13 +56,13 @@
 #define GAIN_A 3
 #define GAIN_B 3
 // how many encoder counts from your goal are accepteable?
-#define distTolerance 3 
+#define distTolerance 0
 
 // minimum power settings
 // Equal to the min PWM for your robot's wheels to move
 // May be different per motor
-#define deadband_A 140
-#define deadband_B 140
+#define deadband_A 80
+#define deadband_B 80
 bool bump = false;
 
 //pos
@@ -72,7 +73,7 @@ double phi = 0;
 
 class wheel{
   public:
-  wheel(int pin, void (*function)){
+  wheel(int pin, void *function){
     pinMode(pin, INPUT_PULLUP); //set the pin to input
     attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(pin), function, CHANGE);
     Serial.println("Here");
@@ -80,6 +81,7 @@ class wheel{
   double displacement(){
     double tbr =(count - last_count) / EncoderCountsPerRev * DistancePerRev;
     last_count = count;  
+    return tbr;
   }
   void changeCount() {
     if (direct > 0) {
@@ -96,18 +98,18 @@ class wheel{
   int direct = 1;
   int last_count = 0;
   int countsDesired = 0;
-
+  
   private:
 };
 
 void indexRightEncoderCount();
 void indexLeftEncoderCount();
 
-wheel right(51, indexRightEncoderCount);
-wheel left(50, indexLeftEncoderCount);
-int moves[] = {FORWARD, LEFT, FORWARD, LEFT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD}; // Fill in this array will forward distances and turn directions in the maze (a la Lab 2)
+wheel right(7, indexRightEncoderCount);
+wheel left(8, indexLeftEncoderCount);
+//int moves[] = {FORWARD, LEFT, FORWARD, LEFT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD}; // Fill in this array will forward distances and turn directions in the maze (a la Lab 2)
 //int moves[] = {FORWARD};
-//int moves[] = {LEFT};
+int moves[] = {LEFT};
 void setup() {
   // set stuff up
   Serial.begin(9600);
@@ -151,10 +153,10 @@ void loop()
 {
   
 int j = 0;
-  // while (digitalRead(pushButton) == 1);
-  // while (digitalRead(pushButton) == 0); // wait for button release
+  while (digitalRead(pushButton) == 1);
+  while (digitalRead(pushButton) == 0); // wait for button release
   for (int i = 0; i < sizeof(moves)/sizeof(moves[0]); i++) { // Loop through entire moves list
-    double tur = 10.9; //5*PI/2
+    double tur = 19*PI/4; // r*theta ~~ 5*PI
     if(moves[i]==LEFT){
       drive(tur,-1,1);
     }
@@ -164,7 +166,7 @@ int j = 0;
     else{
       // Fill with code to drive forward
       double vals[] = {1.0, 1.0, 0.95, 3.0, 2.0, 1.0};
-      double distance = 27 * vals[j]; // Need to change this to whatever the correct distance is
+      double distance = 35 * vals[j]; // Need to change this to whatever the correct distance is
       drive(distance,1,1);
       j++;
     }
@@ -185,7 +187,7 @@ int drive(float distance, int ldir, int rdir)
   right.countDesiredUpdate(distance);
   left.countDesiredUpdate(distance);
   // create variables needed for this function
-  int cmdLeft, cmdRight, errorLeft, errorRight;
+  int cmdLeft, cmdRight, errorLeft, errorRight, lastError;
   
 
   // Find the number of encoder counts based on the distance given, and the 
@@ -196,14 +198,15 @@ int drive(float distance, int ldir, int rdir)
   // we make the errors greater than our tolerance so our first test gets us into the loop
   errorLeft = distTolerance + 1;
   errorRight =  distTolerance + 1;
+  lastError = errorRight+1;
 
   // Begin PID control until move is complete
-  while (errorLeft > distTolerance || errorRight > distTolerance)
+  while ((errorLeft > distTolerance || errorRight > distTolerance) && (lastError > errorRight))
   {
     //noInterrupts();
     if (bump) {
       bump = false;
-      unsigned int encoders[] = {left.count, right.count};
+      long int encoders[] = {left.count, right.count};
       drive(5, -1, -1);
       drive(3, 1, -1);
       drive(5, 1, 1);
@@ -226,10 +229,10 @@ int drive(float distance, int ldir, int rdir)
 
     // Update encoder error
     Serial.print(errorLeft);
-
+    lastError = errorRight;
     errorLeft = abs(left.countsDesired - left.count);
     errorRight = abs(right.countsDesired - right.count) ;
-
+    
   }
 
 }
