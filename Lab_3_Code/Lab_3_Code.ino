@@ -107,9 +107,9 @@ void indexLeftEncoderCount();
 
 wheel right(7, indexRightEncoderCount);
 wheel left(8, indexLeftEncoderCount);
-//int moves[] = {FORWARD, LEFT, FORWARD, LEFT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD}; // Fill in this array will forward distances and turn directions in the maze (a la Lab 2)
+int moves[] = {FORWARD, LEFT, FORWARD, LEFT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD}; // Fill in this array will forward distances and turn directions in the maze (a la Lab 2)
 //int moves[] = {FORWARD};
-int moves[] = {LEFT};
+//int moves[] = {LEFT};
 void setup() {
   // set stuff up
   Serial.begin(9600);
@@ -155,18 +155,24 @@ void loop()
 int j = 0;
   while (digitalRead(pushButton) == 1);
   while (digitalRead(pushButton) == 0); // wait for button release
+  int L = 0;
+  int R = 0;
   for (int i = 0; i < sizeof(moves)/sizeof(moves[0]); i++) { // Loop through entire moves list
-    double tur = 19*PI/4; // r*theta ~~ 5*PI
+    double tur = 20*PI/4; // r*theta ~~ 5*PI
     if(moves[i]==LEFT){
-      drive(tur,-1,1);
+      double vals[] = {1.0, 1.0};
+      drive(tur *vals[L],-1,1);
+      L++;
     }
     else if(moves[i]==RIGHT){
-      drive(tur,1,-1);
+      double vals[] = {.9, .9, 0.9};
+      drive(tur * vals[R],1,-1);
+      R++;
     }
     else{
       // Fill with code to drive forward
-      double vals[] = {1.0, 1.0, 0.95, 3.0, 2.0, 1.0};
-      double distance = 35 * vals[j]; // Need to change this to whatever the correct distance is
+      double vals[] = {1.0, 1.0, 0.95, 2.8, 1.8, 1.0};
+      double distance = 33 * vals[j]; // Need to change this to whatever the correct distance is
       drive(distance,1,1);
       j++;
     }
@@ -187,8 +193,8 @@ int drive(float distance, int ldir, int rdir)
   right.countDesiredUpdate(distance);
   left.countDesiredUpdate(distance);
   // create variables needed for this function
-  int cmdLeft, cmdRight, errorLeft, errorRight, lastError;
-  
+  int cmdLeft, cmdRight, errorLeft, errorRight, lastError, lastTime, thisTime;
+  double kd = 1.3;
 
   // Find the number of encoder counts based on the distance given, and the 
   // configuration of your encoders and wheels
@@ -197,21 +203,23 @@ int drive(float distance, int ldir, int rdir)
   
   // we make the errors greater than our tolerance so our first test gets us into the loop
   errorLeft = distTolerance + 1;
-  errorRight =  distTolerance + 1;
+  errorRight =  right.countsDesired + 1;
   lastError = errorRight+1;
 
   // Begin PID control until move is complete
-  while ((errorLeft > distTolerance || errorRight > distTolerance) && (lastError > errorRight))
+  while ((errorLeft > distTolerance || errorRight > distTolerance) && (lastError >= errorRight))
   {
     //noInterrupts();
     if (bump) {
       bump = false;
-      long int encoders[] = {left.count, right.count};
+      long int encoders[] = {left.count, right.count, left.countsDesired, right.countsDesired};
       drive(5, -1, -1);
-      drive(3, 1, -1);
+      drive(2, 1, -1);
       drive(5, 1, 1);
       left.count = encoders[0];
       right.count = encoders[1];
+      left.countsDesired = encoders[2];
+      right.countsDesired = encoders[3];
     }
     double expGain = 9.0;
     int diff = errorRight - errorLeft;
@@ -219,9 +227,9 @@ int drive(float distance, int ldir, int rdir)
     
     Serial.println((diff));
     // according to the PID formula, what should the current PWMs be?
-    
-    cmdLeft = computeCommand(GAIN_A, deadband_A, errorLeft);
-    cmdRight = computeCommand(GAIN_B, deadband_B, errorRight)* abs(expGain - diff)/ expGain;
+    thisTime = millis();
+    cmdLeft = computeCommand(GAIN_A, deadband_A, errorLeft) + kd*(lastError - errorLeft) / (thisTime- lastTime);
+    cmdRight = computeCommand(GAIN_B, deadband_B, errorRight)* abs(expGain - diff)/ expGain+ kd*(lastError - errorRight) / (thisTime- lastTime);
     //interrupts();
     // Set new PWMs
     run_motor(A, cmdLeft * ldir);
@@ -232,6 +240,7 @@ int drive(float distance, int ldir, int rdir)
     lastError = errorRight;
     errorLeft = abs(left.countsDesired - left.count);
     errorRight = abs(right.countsDesired - right.count) ;
+    lastTime = thisTime;
     
   }
 
