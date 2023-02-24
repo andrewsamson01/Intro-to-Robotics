@@ -1,6 +1,8 @@
-
-/* a closed loop proportional control
-   ms 20200926
+/*
+John Ripple and Andrew Samson
+2/24/2023
+Lab 3: Closed Loop Control
+MEGN 441: Intro to Robotics
 */
 // Include Libraries
 #include <PinChangeInterrupt.h>
@@ -30,12 +32,9 @@
 #define A 0
 #define B 1
 #define pushButton 2 // install a Pullup button with its output into Pin 2
-/* If you'd like to use additional buttons as bump sensors, define their pins 
- *  as descriptive names, such as bumperLeft etc. 
- */
 
 // Drive constants - dependent on robot configuration
-#define EncoderCountsPerRev 38.4
+#define EncoderCountsPerRev 40 //Gear ratio = 40/24 * (Encoder counts per disk=24)
 #define DistancePerRev      25.1
 #define DegreesPerRev       22.3
 
@@ -71,18 +70,24 @@ double y = 0;
 double phi = 0;
 // Lab specific variables
 
+// Wheel class to store values and functions related to each wheel
 class wheel{
   public:
+  // Init function
   wheel(int pin, void *function){
     pinMode(pin, INPUT_PULLUP); //set the pin to input
     attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(pin), function, CHANGE);
     Serial.println("Here");
   }
+
+  // Finds the displacement from the last time it was called.
   double displacement(){
     double tbr =(count - last_count) / EncoderCountsPerRev * DistancePerRev;
     last_count = count;  
     return tbr;
   }
+
+  // Update encoder count based on direction moving
   void changeCount() {
     if (direct > 0) {
       count++;
@@ -91,9 +96,13 @@ class wheel{
     }
 
   }
+
+  // Find the desired counts based on a desired distance to travel
   void countDesiredUpdate(int distance) {
     countsDesired = (EncoderCountsPerRev / DistancePerRev * distance)*direct + count;
   }
+
+  // Class variables
   long int count = 0;
   int direct = 1;
   int last_count = 0;
@@ -105,11 +114,11 @@ class wheel{
 void indexRightEncoderCount();
 void indexLeftEncoderCount();
 
+// Create the wheel objects
 wheel right(7, indexRightEncoderCount);
 wheel left(8, indexLeftEncoderCount);
 int moves[] = {FORWARD, LEFT, FORWARD, LEFT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD}; // Fill in this array will forward distances and turn directions in the maze (a la Lab 2)
-//int moves[] = {FORWARD};
-//int moves[] = {LEFT};
+
 void setup() {
   // set stuff up
   Serial.begin(9600);
@@ -122,28 +131,12 @@ void setup() {
   pinMode(10, OUTPUT);
   digitalWrite(10, LOW);
   
+  // Attach ISR to bumper
   Serial.print("Now setting up the Bumper: Pin ");
   Serial.print(Bumper);
   Serial.println();
   pinMode(Bumper, INPUT_PULLUP);     //set the pin to input
   attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(Bumper), bumperContact, CHANGE);
-  
-
-  // Attaching Wheel Encoder Interrupts
-  // Serial.print("Encoder Testing Program ");
-  // Serial.print("Now setting up the Left Encoder: Pin ");
-  // Serial.print(EncoderMotorLeft);
-  // Serial.println();
-  // pinMode(EncoderMotorLeft, INPUT_PULLUP); //set the pin to input
-  // // this next line setup the PinChange Interrupt
-  // attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(EncoderMotorLeft), indexLeftEncoderCount, CHANGE);
-  // if you "really" want to know what's going on read the PinChange.h file :)
-  /////////////////////////////////////////////////
-  // Serial.print("Now setting up the Right Encoder: Pin ");
-  // Serial.print(EncoderMotorRight);
-  // Serial.println();
-  // pinMode(EncoderMotorRight, INPUT_PULLUP);     //set the pin to input
-  // attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(EncoderMotorRight), indexRightEncoderCount, CHANGE);
 
   
 } /////////////// end of setup ////////////////////////////////////
@@ -158,7 +151,7 @@ int j = 0;
   int L = 0;
   int R = 0;
   for (int i = 0; i < sizeof(moves)/sizeof(moves[0]); i++) { // Loop through entire moves list
-    double tur = 20*PI/4; // r*theta ~~ 5*PI
+    double tur = 20*PI/4; // Arc length = r*theta ~~ 5*PI
     if(moves[i]==LEFT){
       double vals[] = {1.0, 1.0};
       drive(tur *vals[L],-1,1);
@@ -188,6 +181,7 @@ int j = 0;
 
 int drive(float distance, int ldir, int rdir)
 {
+  // Update class variables
   right.direct = rdir;
   left.direct = ldir;
   right.countDesiredUpdate(distance);
@@ -199,38 +193,37 @@ int drive(float distance, int ldir, int rdir)
   // Find the number of encoder counts based on the distance given, and the 
   // configuration of your encoders and wheels
 
-
-  
   // we make the errors greater than our tolerance so our first test gets us into the loop
   errorLeft = distTolerance + 1;
   errorRight =  right.countsDesired + 1;
   lastError = errorRight+1;
 
-  // Begin PID control until move is complete
+  // Begin PD control until move is complete
   while ((errorLeft > distTolerance || errorRight > distTolerance) && (lastError >= errorRight))
   {
-    //noInterrupts();
+    // React to the bump ISR being triggered
     if (bump) {
       bump = false;
-      long int encoders[] = {left.count, right.count, left.countsDesired, right.countsDesired};
-      drive(5, -1, -1);
+      long int encoders[] = {left.count, right.count, left.countsDesired, right.countsDesired}; // Store globals before the bump
+      drive(5, -1, -1); // Reverse, turn, and go forward again
       drive(2, 1, -1);
       drive(5, 1, 1);
+      // Restore global counts before the bump
       left.count = encoders[0];
       right.count = encoders[1];
       left.countsDesired = encoders[2];
       right.countsDesired = encoders[3];
     }
+    // Constants to make the right and left motor errors equal
     double expGain = 9.0;
     int diff = errorRight - errorLeft;
     update_position();
-    
-    Serial.println((diff));
-    // according to the PID formula, what should the current PWMs be?
+
+    // Motor control based on PD controls
     thisTime = millis();
     cmdLeft = computeCommand(GAIN_A, deadband_A, errorLeft) + kd*(lastError - errorLeft) / (thisTime- lastTime);
     cmdRight = computeCommand(GAIN_B, deadband_B, errorRight)* abs(expGain - diff)/ expGain+ kd*(lastError - errorRight) / (thisTime- lastTime);
-    //interrupts();
+
     // Set new PWMs
     run_motor(A, cmdLeft * ldir);
     run_motor(B, cmdRight * rdir);
@@ -245,20 +238,6 @@ int drive(float distance, int ldir, int rdir)
   }
 
 }
-////////////////////////////////////////////////////////////////////////////////
-
-
-// Write a function for turning with PID control, similar to the drive function
-
-
-//////////////////////////////////////////////////////////
-
-
-// If you want, write a function to correct your path due 
-// to an active bump sensor. You will want to compensate somehow 
-// for any wheel encoder counts that happend during this manuever
-
-
 //////////////////////////////////////////////////////////
 int computeCommand(int gain, int deadband, int error)
 //  gain, deadband, and error, both are integer values
@@ -276,7 +255,6 @@ int computeCommand(int gain, int deadband, int error)
 //////////////////////////////////////////////////////////
 
 // These are the encoder interupt funcitons, they should NOT be edited
-
 void indexLeftEncoderCount()
 {
   left.changeCount();
@@ -285,7 +263,6 @@ void indexLeftEncoderCount()
 //////////////////////////////////////////////////////////
 void indexRightEncoderCount()
 {
-  //rightEncoderCount++;
   right.changeCount();
 }
 ///////////////////////////////////////////////////////////
@@ -309,10 +286,10 @@ void update_position(){ //Updates position for localization
   y = y + yOld;
 
   Serial.print("Left\t");
-    Serial.print(left.count); 
-    Serial.print("\t\tRight\t");
-    Serial.print(right.count);
-    Serial.print("\t   ");
+  Serial.print(left.count); 
+  Serial.print("\t\tRight\t");
+  Serial.print(right.count);
+  Serial.print("\t   ");
   Serial.print(phi);
   Serial.print('\t');
   Serial.print(x);
