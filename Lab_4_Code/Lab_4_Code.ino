@@ -285,18 +285,19 @@ void explore() {
 ////////////////////////////////////////////////////////////////////////////////
 void solve() {
   // Write your own algorithm to solve the maze using the list of moves from explore
-  for( int i = 0; i < 50; i++){
-    if(moves[i] == RIGHT && moves[i+1] == RIGHT){
-      int temp = 0;
-      while(moves[i + temp] == FORWARD){
-        temp++;
+    for( int i = 0; i < 50; i++){
+      if(moves[i] == RIGHT && moves[i+1] == RIGHT){
+        int temp = 0;
+        i += 2;
+        while(moves[i + temp] == FORWARD){
+          temp++;
+        }
+        for (int j = i - temp - 2; j < i + temp; j++) {
+          moves[j] = 0;
+        }
+        i += temp;
+        moves[i] *= -1;
       }
-      for (int j = -temp + i+1; j < i + temp; j++) {
-        moves[j] = 0;
-      }
-      i+= temp;
-      moves[++i] *= -1;
-    }
   }
 }
 ////////////////////////////////////////////////////////////////////////////////
