@@ -38,7 +38,7 @@ Lab 4: Solve the Maze
 #define DegreesPerRev       22.3
 
 //These are to build your moves array, a la Lab 2
-#define FORWARD             0
+#define FORWARD             2
 #define LEFT                1
 #define RIGHT              -1
 
@@ -68,11 +68,12 @@ bool bump = false;
 #define sideIR  A1
 
 // If using any Ultrasonic - change pins for your needs
-#define trig 4
-#define echo 5
+#define trig 3
+#define echo 6
 // if side dist is Ultrasonic
-HCSR04 hc(trig, echo); 
+HCSR04 hc(trig, new int[2] {echo, 9}, 2); //left
 // if front dist is Ultrasonic
+
 //SR04 frontUS = SR04(trig, echo);
 
 // Define the distance tolerance that indicates a wall is present
@@ -104,7 +105,6 @@ class wheel{
     } else {
       count--;
     }
-
   }
 
   // Find the desired counts based on a desired distance to travel
@@ -140,27 +140,56 @@ void setup() {
   motor_setup();
   pinMode(pushButton, INPUT_PULLUP);
   // add additional pinMode statements for any bump sensors
-
-
-  // // add additional pinMode statements for any bump sensors
-  // pinMode(5, OUTPUT);
-  // digitalWrite(5, HIGH);
-  // pinMode(10, OUTPUT);
-  // digitalWrite(10, LOW);
   
-  // // Attach ISR to bumper
-  // Serial.print("Now setting up the Bumper: Pin ");
-  // Serial.print(Bumper);
-  // Serial.println();
-  // pinMode(Bumper, INPUT_PULLUP);     //set the pin to input
-  // attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(Bumper), bumperContact, CHANGE);
+
+   // add additional pinMode statements for any bump sensors
+   //GRD AND VCC FOR SENSORS AND ACTUATORS
+
+  //right encoder
+   pinMode(4, OUTPUT);
+   digitalWrite(4, HIGH);
+
+   //IR Sensor
+   pinMode(A3, OUTPUT);
+   digitalWrite(A3, LOW);
+
+  //right Ultrasonic
+   pinMode(A2, OUTPUT);
+   analogWrite(A2, LOW);
+   pinMode(A1, OUTPUT);
+   analogWrite(A1, 1023);
+
+  //left sensor 
+   pinMode(A4, OUTPUT);
+   analogWrite(A4, LOW);
+   pinMode(A5, OUTPUT);
+   analogWrite(A5, 1023);
+
+   pinMode(A0, INPUT);
+   //pinMode(A1, INPUT);
+   
+   // Attach ISR to bumper
+//   Serial.print("Now setting up the Bumper: Pin ");
+//   Serial.print(Bumper);
+//   Serial.println();
+//   pinMode(Bumper, INPUT_PULLUP);     //set the pin to input
+//   attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(Bumper), bumperContact, CHANGE);
 
 } /////////////// end of setup ////////////////////////////////////
 
+int last_time = 0;
 /////////////////////// loop() ////////////////////////////////////
 void loop()
 {
-
+  
+//  while(true){
+//    Serial.print(readFrontDist());
+//    Serial.print('\t');
+//    Serial.print(hc.dist(0));
+//    Serial.print('\t');
+//    Serial.println(hc.dist(1));
+//    delay(60);
+//  }
   while (digitalRead(pushButton) == 1); // wait for button push
   while (digitalRead(pushButton) == 0); // wait for button release
   explore();
@@ -179,7 +208,7 @@ void loop()
 float readFrontDist() { 
   // If IR distance sensor
   int reading = analogRead(frontIR);
-  float dist = 0;// Equation from your calibration;
+  float dist = 1/(0.1* reading * 5.0/1023 + -0.026) - 0.9;// Equation from your calibration;
 
   // if Ultrasonic
   // float dist = frontUS.Distance(); //(returns in cm)
@@ -190,35 +219,85 @@ float readFrontDist() {
 float readSideDist() {
   // If IR distance sensor
   int reading = analogRead(sideIR);
-  float dist = 0;// Equation from your calibration;
+  float dist = 1/(0.122*reading*5.0/1023 + -0.109) - -3.5;// Equation from your calibration;
 
   // IF Ultrasonic
   // float dist = hc.Distance(); //(returns in cm)
+  
   
   return dist;
 }
 //////////////////////////////// end of loop() /////////////////////////////////
 void explore() {
+  float sider, sidel,front;
+  int i = 0;
+  float fronttol = 10;
+  double tur = 20*PI/4; // Arc length = r*theta ~~ 5*PI
   while (digitalRead(pushButton) == 1) { //while maze is not solved
     // Read distances
-    float side = readSideDist();
-    float front = readFrontDist();
-    if (side > wallTol) {// If side is not a wall
+    if(millis() - last_time >= 60){
+      sider = hc.dist(0);
+      sidel = hc.dist(1);
+      last_time = millis();
+    }
+    front = readFrontDist();
+    
+    if (sider > wallTol) {// If side is not a wall
+      drive(tur * 0.9,1,-1);
+      drive(33, 1, 1);
+      //backup
+      if(front < fronttol)
+        drive( fronttol - front, -1, -1);
+      moves[i] = RIGHT;
+      moves[i+1] = FORWARD;
+      i += 2;
       // turn and drive forward
       // Record actions
     }
     else if (front > wallTol) {// else if front is not a wall
-      // drive forward
+      drive(33, 1, 1);
+      //backup
+      if(front < fronttol)
+        drive( fronttol - front, -1, -1);
       // Record action
-    } else {
+      moves[i] = FORWARD;
+      i++;
+    } else if(sidel > wallTol){
+      drive(tur ,-1,1);
+      drive(33, 1, 1);
+      //backup
+      if(front < fronttol)
+        drive( fronttol - front, -1, -1);
+      moves[i] = LEFT;
+      moves[++i] = FORWARD;
+      i++;
       // turn away from side
       // Record action
+    }else{
+      drive(tur * 2, 1, -1);
+      moves[i] = RIGHT;
+      moves[++i] = RIGHT;
+      i++; 
+      
     }
   }
 }
 ////////////////////////////////////////////////////////////////////////////////
 void solve() {
   // Write your own algorithm to solve the maze using the list of moves from explore
+  for( int i = 0; i < 50; i++){
+    if(moves[i] == RIGHT && moves[i+1] == RIGHT){
+      int temp = 0;
+      while(moves[i + temp] == FORWARD){
+        temp++;
+      }
+      for (int j = -temp + i+1; j < i + temp; j++) {
+        moves[j] = 0;
+      }
+      i+= temp;
+      moves[++i] *= -1;
+    }
+  }
 }
 ////////////////////////////////////////////////////////////////////////////////
 void runMaze() {
@@ -237,7 +316,7 @@ void runMaze() {
       drive(tur * vals[R],1,-1);
       R++;
     }
-    else{
+    else if(moves[i] == FORWARD){
       // Fill with code to drive forward
       double vals[] = {1.0, 1.0, 0.95, 2.8, 1.8, 1.0};
       double distance = 33 * vals[j]; // Need to change this to whatever the correct distance is
