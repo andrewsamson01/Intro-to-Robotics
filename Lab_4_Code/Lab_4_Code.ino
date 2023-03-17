@@ -57,8 +57,8 @@ Lab 4: Solve the Maze
 // minimum power settings
 // Equal to the min PWM for your robot's wheels to move
 // May be different per motor
-#define deadband_A 80
-#define deadband_B 80
+#define deadband_A 100
+#define deadband_B 100
 bool bump = false;
 
 
@@ -87,7 +87,6 @@ class wheel{
   wheel(int pin, void *function){
     pinMode(pin, INPUT_PULLUP); //set the pin to input
     attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(pin), function, CHANGE);
-    Serial.println("Here");
   }
 
   // Finds the displacement from the last time it was called.
@@ -179,6 +178,8 @@ void loop()
 {
   while (digitalRead(pushButton) == 1){
     printSensorData();
+    
+
   }; // wait for button push
   while (digitalRead(pushButton) == 0); // wait for button release
   explore();
@@ -239,44 +240,50 @@ void explore() {
     Serial.print("\tLeft Distance: ");
     Serial.println(sidel);
     
-    // if (sider > wallTol) {// If side is not a wall
-    //   drive(tur * 0.9,1,-1);
-    //   drive(33, 1, 1);
-    //   //backup
-    //   if(front < fronttol)
-    //     drive( fronttol - front, -1, -1);
-    //   moves[i] = RIGHT;
-    //   moves[i+1] = FORWARD;
-    //   i += 2;
-    //   // turn and drive forward
-    //   // Record actions
-    // }
-    // else if (front > wallTol) {// else if front is not a wall
-    //   drive(33, 1, 1);
-    //   //backup
-    //   if(front < fronttol)
-    //     drive( fronttol - front, -1, -1);
-    //   // Record action
-    //   moves[i] = FORWARD;
-    //   i++;
-    // } else if(sidel > wallTol){
-    //   drive(tur ,-1,1);
-    //   drive(33, 1, 1);
-    //   //backup
-    //   if(front < fronttol)
-    //     drive( fronttol - front, -1, -1);
-    //   moves[i] = LEFT;
-    //   moves[++i] = FORWARD;
-    //   i++;
-    //   // turn away from side
-    //   // Record action
-    // }else{
-    //   drive(tur * 2, 1, -1);
-    //   moves[i] = RIGHT;
-    //   moves[++i] = RIGHT;
-    //   i++; 
+     if (sider > wallTol) {// If side is not a wall
+       Serial.println("TurnRt");
+       drive(tur * 0.9, 1,-1);
+       drive(33, 1, 1);
+       //backup
+       if(front < fronttol)
+         drive( fronttol - front, -1, -1);
+       moves[i] = RIGHT;
+       moves[i+1] = FORWARD;
+       i += 2;
+       
+       // turn and drive forward
+       // Record actions
+     }
+     else if (front > wallTol) {// else if front is not a wall
+       Serial.println("Strgt");
+
+       drive(33, 1, 1);
+       //backup
+       if(front < fronttol)
+         drive( fronttol - front, -1, -1);
+       // Record action
+       moves[i] = FORWARD;
+       i++;
+     } else if(sidel > wallTol){
+       Serial.println("TurnLt");
+       drive(tur ,-1,1);
+       drive(33, 1, 1);
+       //backup
+       if(front < fronttol)
+         drive( fronttol - front, -1, -1);
+       moves[i] = LEFT;
+       moves[++i] = FORWARD;
+       i++;
+       // turn away from side
+       // Record action
+     }else{
+       Serial.println("AbtFce");
+       drive(tur * 2, 1, -1);
+       moves[i] = RIGHT;
+       moves[++i] = RIGHT;
+       i++; 
       
-    // }
+     }
   }
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -350,19 +357,7 @@ int drive(float distance, int ldir, int rdir)
   // Begin PD control until move is complete
   while ((errorLeft > distTolerance || errorRight > distTolerance) && (lastError >= errorRight))
   {
-    // React to the bump ISR being triggered
-    if (bump) {
-      bump = false;
-      long int encoders[] = {left.count, right.count, left.countsDesired, right.countsDesired}; // Store globals before the bump
-      drive(5, -1, -1); // Reverse, turn, and go forward again
-      drive(2, 1, -1);
-      drive(5, 1, 1);
-      // Restore global counts before the bump
-      left.count = encoders[0];
-      right.count = encoders[1];
-      left.countsDesired = encoders[2];
-      right.countsDesired = encoders[3];
-    }
+    
     // Constants to make the right and left motor errors equal
     double expGain = 9.0;
     int diff = errorRight - errorLeft;
@@ -378,11 +373,12 @@ int drive(float distance, int ldir, int rdir)
     run_motor(B, cmdRight * rdir);
 
     // Update encoder error
-    //Serial.print(errorLeft);
+    //Serial.println(errorLeft);
     lastError = errorRight;
     errorLeft = abs(left.countsDesired - left.count);
     errorRight = abs(right.countsDesired - right.count) ;
     lastTime = thisTime;
+    delay(10);
     
   }
 
