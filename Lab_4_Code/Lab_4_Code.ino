@@ -46,7 +46,6 @@ Lab 4: Solve the Maze
 // You may change these as you see fit.
 #define EncoderMotorLeft  7
 #define EncoderMotorRight 8
-#define Bumper 9
 
 // Proportional Control constants
 // what are your ratios of PWM:Encoder Count error?
@@ -68,7 +67,7 @@ bool bump = false;
 #define sideIR  A1
 
 // If using any Ultrasonic - change pins for your needs
-#define trig 3
+#define trig 10
 #define echo 6
 // if side dist is Ultrasonic
 HCSR04 hc(trig, new int[2] {echo, 9}, 2); //left
@@ -128,8 +127,8 @@ void bumperContact();
 void updatePosition();
 
 // Create the wheel objects
-wheel right(7, indexRightEncoderCount);
-wheel left(8, indexLeftEncoderCount);
+wheel right(EncoderMotorRight, indexRightEncoderCount);
+wheel left(EncoderMotorLeft, indexLeftEncoderCount);
 
 
 int moves[50]; // Empty array of 50 moves, probably more than needed, just in case
@@ -145,9 +144,13 @@ void setup() {
    // add additional pinMode statements for any bump sensors
    //GRD AND VCC FOR SENSORS AND ACTUATORS
 
-  //right encoder
-   pinMode(4, OUTPUT);
-   digitalWrite(4, HIGH);
+  //right encoder 5v
+   pinMode(5, OUTPUT);
+   digitalWrite(5, HIGH);
+  
+  //IR Front 5v
+  pinMode(4, OUTPUT);
+  digitalWrite(4, HIGH);
 
    //IR Sensor
    pinMode(A3, OUTPUT);
@@ -167,13 +170,6 @@ void setup() {
 
    pinMode(A0, INPUT);
    //pinMode(A1, INPUT);
-   
-   // Attach ISR to bumper
-//   Serial.print("Now setting up the Bumper: Pin ");
-//   Serial.print(Bumper);
-//   Serial.println();
-//   pinMode(Bumper, INPUT_PULLUP);     //set the pin to input
-//   attachPinChangeInterrupt(digitalPinToPinChangeInterrupt(Bumper), bumperContact, CHANGE);
 
 } /////////////// end of setup ////////////////////////////////////
 
@@ -181,21 +177,15 @@ int last_time = 0;
 /////////////////////// loop() ////////////////////////////////////
 void loop()
 {
-  
-//  while(true){
-//    Serial.print(readFrontDist());
-//    Serial.print('\t');
-//    Serial.print(hc.dist(0));
-//    Serial.print('\t');
-//    Serial.println(hc.dist(1));
-//    delay(60);
-//  }
-  while (digitalRead(pushButton) == 1); // wait for button push
+  while (digitalRead(pushButton) == 1){
+    printSensorData();
+  }; // wait for button push
   while (digitalRead(pushButton) == 0); // wait for button release
   explore();
   run_motor(A, 0);
   run_motor(B, 0);
   solve();
+  Serial.print("Here");
   while (1) { //Inifnite number of runs, so you don't have to re-explore everytime a mistake happens
     while (digitalRead(pushButton) == 1); // wait for button push
     while (digitalRead(pushButton) == 0); // wait for button release
@@ -235,51 +225,58 @@ void explore() {
   double tur = 20*PI/4; // Arc length = r*theta ~~ 5*PI
   while (digitalRead(pushButton) == 1) { //while maze is not solved
     // Read distances
+    //printSensorData();
     if(millis() - last_time >= 60){
       sider = hc.dist(0);
-      sidel = hc.dist(1);
+      sidel = hc.dist(1);    
+      front = readFrontDist();
       last_time = millis();
     }
-    front = readFrontDist();
+    Serial.print("Front Distance: ");
+    Serial.print(front);
+    Serial.print("\tRight Distance: ");
+    Serial.print(sider);
+    Serial.print("\tLeft Distance: ");
+    Serial.println(sidel);
     
-    if (sider > wallTol) {// If side is not a wall
-      drive(tur * 0.9,1,-1);
-      drive(33, 1, 1);
-      //backup
-      if(front < fronttol)
-        drive( fronttol - front, -1, -1);
-      moves[i] = RIGHT;
-      moves[i+1] = FORWARD;
-      i += 2;
-      // turn and drive forward
-      // Record actions
-    }
-    else if (front > wallTol) {// else if front is not a wall
-      drive(33, 1, 1);
-      //backup
-      if(front < fronttol)
-        drive( fronttol - front, -1, -1);
-      // Record action
-      moves[i] = FORWARD;
-      i++;
-    } else if(sidel > wallTol){
-      drive(tur ,-1,1);
-      drive(33, 1, 1);
-      //backup
-      if(front < fronttol)
-        drive( fronttol - front, -1, -1);
-      moves[i] = LEFT;
-      moves[++i] = FORWARD;
-      i++;
-      // turn away from side
-      // Record action
-    }else{
-      drive(tur * 2, 1, -1);
-      moves[i] = RIGHT;
-      moves[++i] = RIGHT;
-      i++; 
+    // if (sider > wallTol) {// If side is not a wall
+    //   drive(tur * 0.9,1,-1);
+    //   drive(33, 1, 1);
+    //   //backup
+    //   if(front < fronttol)
+    //     drive( fronttol - front, -1, -1);
+    //   moves[i] = RIGHT;
+    //   moves[i+1] = FORWARD;
+    //   i += 2;
+    //   // turn and drive forward
+    //   // Record actions
+    // }
+    // else if (front > wallTol) {// else if front is not a wall
+    //   drive(33, 1, 1);
+    //   //backup
+    //   if(front < fronttol)
+    //     drive( fronttol - front, -1, -1);
+    //   // Record action
+    //   moves[i] = FORWARD;
+    //   i++;
+    // } else if(sidel > wallTol){
+    //   drive(tur ,-1,1);
+    //   drive(33, 1, 1);
+    //   //backup
+    //   if(front < fronttol)
+    //     drive( fronttol - front, -1, -1);
+    //   moves[i] = LEFT;
+    //   moves[++i] = FORWARD;
+    //   i++;
+    //   // turn away from side
+    //   // Record action
+    // }else{
+    //   drive(tur * 2, 1, -1);
+    //   moves[i] = RIGHT;
+    //   moves[++i] = RIGHT;
+    //   i++; 
       
-    }
+    // }
   }
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -381,7 +378,7 @@ int drive(float distance, int ldir, int rdir)
     run_motor(B, cmdRight * rdir);
 
     // Update encoder error
-    Serial.print(errorLeft);
+    //Serial.print(errorLeft);
     lastError = errorRight;
     errorLeft = abs(left.countsDesired - left.count);
     errorRight = abs(right.countsDesired - right.count) ;
@@ -415,8 +412,16 @@ void indexRightEncoderCount()
 }
 
 ///////////////////////////////////////////////////////////
-void bumperContact(){
-  if (!digitalRead(Bumper)) {
-    bump = true;
-  }
+
+void printSensorData() {
+    Serial.print("Right Encoder: ");
+    Serial.print(right.count);
+    Serial.print("\tLeft Encoder: ");
+    Serial.print(left.count);
+    Serial.print("\tFront Distance: ");
+    Serial.print(readFrontDist());
+    Serial.print("\tRight Distance: ");
+    Serial.print(hc.dist(0));
+    Serial.print("\tLeft Distance: ");
+    Serial.println(hc.dist(1));
 }
