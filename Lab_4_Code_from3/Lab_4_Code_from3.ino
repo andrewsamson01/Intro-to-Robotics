@@ -232,17 +232,14 @@ int drive(float distance, int ldir, int rdir)
   while ((errorLeft > distTolerance || errorRight > distTolerance) && (lastError >= errorRight))
   {
     // React to the bump ISR being triggered
+    float errorCenter = 1;
     if (bump) {
-      bump = false;
-      long int encoders[] = {left.count, right.count, left.countsDesired, right.countsDesired}; // Store globals before the bump
-      drive(5, -1, -1); // Reverse, turn, and go forward again
-      drive(2, 1, -1);
-      drive(5, 1, 1);
-      // Restore global counts before the bump
-      left.count = encoders[0];
-      right.count = encoders[1];
-      left.countsDesired = encoders[2];
-      right.countsDesired = encoders[3];
+//      float mxg = 1.1;
+//      
+//      errorCenter = mxg + hc.dist(0) * (mxg - 1) / 5.0 ;
+//      if (abs(errorCenter) < 1) {
+//        errorCenter = 1;
+//      }
     }
     // Constants to make the right and left motor errors equal
     double expGain = 9.0;
@@ -252,7 +249,10 @@ int drive(float distance, int ldir, int rdir)
     // Motor control based on PD controls
     thisTime = millis();
     cmdLeft = computeCommand(GAIN_A, deadband_A, errorLeft) + kd*(lastError - errorLeft) / (thisTime- lastTime);
-    cmdRight = computeCommand(GAIN_B, deadband_B, errorRight)* abs(expGain - diff)/ expGain+ kd*(lastError - errorRight) / (thisTime- lastTime);
+    if(bump)
+      cmdRight = computeCommand(GAIN_B, deadband_B, errorRight) * errorCenter + kd*(lastError - errorRight) / (thisTime- lastTime);
+    else
+      cmdRight = computeCommand(GAIN_B, deadband_B, errorRight) *  abs(expGain - diff)/ expGain + kd*(lastError - errorRight) / (thisTime- lastTime);
 
     // Set new PWMs
     run_motor(A, cmdLeft * ldir);
@@ -296,12 +296,12 @@ void explore() {
       front = readFrontDist();
       last_time = millis();
     }
-    Serial.print("Front Distance: ");
-    Serial.print(front);
-    Serial.print("\tRight Distance: ");
-    Serial.print(sider);
-    Serial.print("\tLeft Distance: ");
-    Serial.println(sidel);
+//    Serial.print("Front Distance: ");
+//    Serial.print(front);
+//    Serial.print("\tRight Distance: ");
+//    Serial.print(sider);
+//    Serial.print("\tLeft Distance: ");
+//    Serial.println(sidel);
     
      if (sider > wallTol) {// If side is not a wall
        Serial.println("TurnRt");
@@ -319,11 +319,21 @@ void explore() {
      }
      else if (front > wallTol) {// else if front is not a wall
        Serial.println("Strgt");
+       bump = true;
+       if (sider != 5) {
+        float height = 5 - hc.dist(0);
+        int dir = 1;
+        if (atan(height / 7.0) > 0) {
+          dir = -1;
+        }
+        drive(abs(atan(height / 7.0)), -dir, dir);
+       }
+       drive(7, 1, 1);
 
-       drive(10, 1, 1);
+       bump = false;
        //backup
-       if(front < fronttol)
-         drive( fronttol - front, -1, -1);
+//       if(front < fronttol)
+//         drive( fronttol - front, -1, -1);
        // Record action
        moves[i] = FORWARD;
        i++;
@@ -443,9 +453,9 @@ void update_position(){ //Updates position for localization
 }
 
 void printSensorData() {
-    Serial.print("rEnc: ");
+    Serial.print("lEnc: ");
     Serial.print(right.count);
-    Serial.print("\tlEnc: ");
+    Serial.print("\trEnc: ");
     Serial.print(left.count);
     Serial.print("\tfDist: ");
     Serial.print(readFrontDist());
