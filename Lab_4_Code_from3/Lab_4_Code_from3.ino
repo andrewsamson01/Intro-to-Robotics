@@ -185,7 +185,7 @@ void setup() {
 
    pinMode(A0, INPUT);
    //pinMode(A1, INPUT);
-   TCCR0A
+   
 
   
 } /////////////// end of setup ////////////////////////////////////
@@ -315,7 +315,7 @@ void explore() {
       sidel = leftSensorSum / sensorReadings;    
       front = readFrontDist();
       last_time = millis();
-      front = IRSensorSum / SensorReadings;
+      front = IRSensorSum / sensorReadings;
 
       //Should we disable ISRS for these 4 lines V?
       sensorReadings = 0;
@@ -387,7 +387,7 @@ void solve() {
       if(moves[i] == RIGHT && moves[i+1] == RIGHT){
         int temp = 0;
         i += 2;
-        while(moves[i + temp] == FORWARD || (moves[i+temp] == -moves[i- temp - 2]){
+        while(moves[i + temp] == FORWARD || (moves[i+temp] == -moves[i- temp - 2])){
           temp++;
         }
         for (int j = i - temp - 2; j < i + temp; j++) {
