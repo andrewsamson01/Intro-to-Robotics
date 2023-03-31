@@ -146,7 +146,7 @@ float IRSensorSum = 0;
 // Create the wheel objects
 wheel right(7, indexRightEncoderCount);
 wheel left(8, indexLeftEncoderCount);
-int moves[] = {FORWARD, LEFT, FORWARD, LEFT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD}; // Fill in this array will forward distances and turn directions in the maze (a la Lab 2)
+int moves[50]; // Fill in this array will forward distances and turn directions in the maze (a la Lab 2)
 int last_time = 0;
 void setup() {
   // set stuff up
@@ -310,7 +310,7 @@ void explore() {
     //printSensorData();
     IrAvg  += readFrontDist();
     itters++;
-    if(millis() - last_time >= 60){
+    // if(millis() - last_time >= 60){
       sider = rightSensorSum / sensorReadings;
       sidel = leftSensorSum / sensorReadings;    
       front = readFrontDist();
@@ -322,7 +322,7 @@ void explore() {
       leftSensorSum = 0;
       rightSensorSum = 0;
       IRSensorSum = 0;
-    }
+    // }
     
 //    Serial.print("Front Distance: ");
 //    Serial.print(front);
