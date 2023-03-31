@@ -12,15 +12,15 @@ MEGN 441: Intro to Robotics
 #define trig 10
 #define echoLeft 9
 #define echoRight 6
-
+#define echoFront 4
 
 // if side sensor is Ultrasonic
-HCSR04 hc(trig, new int[2] {echoRight, echoLeft}, 2);
+HCSR04 hc(trig, new int[3] {echoRight, echoLeft, echoFront}, 3);
 // if front sensor is Ultrasonic
 //HCSR04 frontUS(trig, echo);
 
 // Define the distance tolerance that indicates a wall is present
-#define wallTol 10 //cm
+#define wallTol 13 //cm
 
 //int moves[50]; // Empty array of 50 moves, probably more than needed, just in case
 
@@ -140,7 +140,7 @@ void indexLeftEncoderCount();
 int sensorReadings = 0;
 float leftSensorSum = 0;
 float rightSensorSum = 0;
-float IRSensorSum = 0;
+float frontSensorSum = 0;
 
 
 // Create the wheel objects
@@ -163,11 +163,10 @@ void setup() {
    pinMode(5, OUTPUT);
    digitalWrite(5, HIGH);
   
-  //IR Front 5v
-  pinMode(4, OUTPUT);
-  digitalWrite(4, HIGH);
+  //Front ultrasonic
+   pinMode(A0, OUTPUT);
+   analogWrite(A0, 1023);
 
-   //IR Sensor
    pinMode(A3, OUTPUT);
    digitalWrite(A3, LOW);
 
@@ -183,7 +182,7 @@ void setup() {
    pinMode(A5, OUTPUT);
    analogWrite(A5, 1023);
 
-   pinMode(A0, INPUT);
+   //pinMode(4, INPUT);
    //pinMode(A1, INPUT);
    
 
@@ -196,18 +195,12 @@ void loop()
     
   while (digitalRead(pushButton) == 1){
     printSensorData();
-    }// wait for button push
-//  while (digitalRead(pushButton) == 0);
-//  while (digitalRead(pushButton) == 1){
-//    run_motor(A, -188);
-//    run_motor(B, 188);
-//  }
-//  run_motor(A, 0);
-//    run_motor(B, 0);
+    }
   while (digitalRead(pushButton) == 0); // wait for button release
   explore();
   run_motor(A, 0);
   run_motor(B, 0);
+  while (digitalRead(pushButton) == 0);
   solve();
   while (true) { //Inifnite number of runs, so you don't have to re-explore everytime a mistake happens
     while (digitalRead(pushButton) == 1); // wait for button push
@@ -245,43 +238,34 @@ int drive(float distance, int ldir, int rdir)
   // Begin PD control until move is complete
   while ((errorLeft > distTolerance || errorRight > distTolerance) && (lastError >= errorRight))
   {
-    // React to the bump ISR being triggered
-    float errorCenter = 1;
-    if (bump) {
-//      float mxg = 1.1;
-//      
-//      errorCenter = mxg + hc.dist(0) * (mxg - 1) / 5.0 ;
-//      if (abs(errorCenter) < 1) {
-//        errorCenter = 1;
-//      }
-    }
+    
     // Constants to make the right and left motor errors equal
     double expGain = 9.0;
-    int diff = errorRight - errorLeft;
-    //printSensorData();
+    double diff = errorRight - errorLeft;
+    //update_position();
 
     // Motor control based on PD controls
     thisTime = millis();
-    cmdLeft = computeCommand(GAIN_A, deadband_A, errorLeft) + kd*(lastError - errorLeft) / (thisTime- lastTime);
-    if(bump)
-      cmdRight = computeCommand(GAIN_B, deadband_B, errorRight) * errorCenter + kd*(lastError - errorRight) / (thisTime- lastTime);
-    else
-      cmdRight = computeCommand(GAIN_B, deadband_B, errorRight) *  abs(expGain - diff)/ expGain + kd*(lastError - errorRight) / (thisTime- lastTime);
+    cmdLeft = computeCommand(GAIN_A, deadband_A, errorLeft);
+    cmdRight = computeCommand(GAIN_B, deadband_B, errorRight)* abs(expGain - diff)/ expGain;
 
     // Set new PWMs
     run_motor(A, cmdLeft * ldir);
     run_motor(B, cmdRight * rdir);
 
     // Update encoder error
-    //Serial.println(errorLeft);
+    //Serial.print(errorRight);
     delay(2);
     lastError = errorRight;
     errorLeft = abs(left.countsDesired - left.count);
-    errorRight = abs(right.countsDesired - right.count) ;
+    errorRight = abs(right.countsDesired - right.count);
+//    Serial.println(errorRight);
+//    Serial.println(errorLeft);
     lastTime = thisTime;
     
   }
-
+    run_motor(A, 0);
+    run_motor(B, 0);
 }
 ////////////////////////////////////////////////////////
 float readFrontDist() { 
@@ -298,46 +282,51 @@ float readFrontDist() {
 
 
 void explore() {
-  float sider, sidel,front;
+  double sider, sidel,front;
   int i = 0;
-  float fronttol = 8;
-  double tur = 20*PI/4; // Arc length = r*theta ~~ 5*PI
+  float fronttol = 10;
+  double tur = 20*PI/4.0; // Arc length = r*theta ~~ 5*PI
   int itters = 0;
   float IrAvg = 0;
   float centimetersForward = 29;
   while (digitalRead(pushButton) == 1) { //while maze is not solved
     // Read distances
     //printSensorData();
-    IrAvg  += readFrontDist();
-    itters++;
-    // if(millis() - last_time >= 60){
-      sider = rightSensorSum / sensorReadings;
-      sidel = leftSensorSum / sensorReadings;    
-      front = readFrontDist();
-      last_time = millis();
-      front = IRSensorSum / sensorReadings;
-
-      //Should we disable ISRS for these 4 lines V?
-      sensorReadings = 0;
-      leftSensorSum = 0;
-      rightSensorSum = 0;
-      IRSensorSum = 0;
-    // }
+    sider = 0;
+    sidel = 0;
+    front = 0;
     
-//    Serial.print("Front Distance: ");
-//    Serial.print(front);
-//    Serial.print("\tRight Distance: ");
-//    Serial.print(sider);
-//    Serial.print("\tLeft Distance: ");
-//    Serial.println(sidel);
+    // if(millis() - last_time >= 60){
+    for(int j = 0; j < 5; j++){
+      sider += hc.dist(0);
+      sidel += hc.dist(1);    
+      last_time = millis();
+      front += hc.dist(2);
+      delay(60);
+      Serial.print("F: ");
+    Serial.print(front);
+    Serial.print("\tR: ");
+    Serial.print(sider);
+    Serial.print("\tL: ");
+    Serial.println(sidel);
+      
+     }
+     sider /= 5.0;
+     sidel /= 5.0;
+     front /= 5.0;
+    
+    Serial.print("AvgF: ");
+    Serial.print(front);
+    Serial.print("\tAvgR: ");
+    Serial.print(sider);
+    Serial.print("\tAvgL: ");
+    Serial.println(sidel);
     
      if (sider > wallTol) {// If side is not a wall
        Serial.println("TurnRt");
        drive(tur * 0.9, 1,-1);
+       Serial.println("ThenStraight");
        drive(centimetersForward, 1, 1);
-//       //backup
-//       if(front < fronttol)
-//         drive( fronttol - front, -1, -1);
        moves[i] = RIGHT;
        moves[i+1] = FORWARD;
        i += 2;
@@ -345,37 +334,35 @@ void explore() {
        // turn and drive forward
        // Record actions
      }
-     else if (front > fronttol) {// else if front is not a wall
+     else if (front > fronttol || front < 2.0) {// else if front is not a wall
        Serial.println("Strgt");
-       
        drive(centimetersForward, 1, 1);
-         //backup
-//       if(front < fronttol)
-//         drive( fronttol - front, -1, -1);
+       //Reverse
+//       if (front < fronttol && front > 2.0) {
+//        drive(fronttol - front, -1, -1);
+//       }
        // Record action
        moves[i] = FORWARD;
        i++;
-     } else if(sidel > wallTol){
+     } else {
        Serial.println("TurnLt");
        drive(tur ,-1,1);
-       drive(centimetersForward, 1, 1);
-//       //backup
-//       if(front < fronttol)
-//         drive( fronttol - front, -1, -1);
+       //drive(centimetersForward, 1, 1);
        moves[i] = LEFT;
-       moves[++i] = FORWARD;
+       //moves[++i] = FORWARD;
        i++;
        
        // turn away from side
        // Record action
-     }else{
-       Serial.println("AbtFce");
-       drive(tur * 2, 1, -1);
-       moves[i] = RIGHT;
-       moves[++i] = RIGHT;
-       i++; 
-      
      }
+//     else{
+//       Serial.println("AbtFce");
+//       drive(tur * 2, 1, -1);
+//       moves[i] = RIGHT;
+//       moves[++i] = RIGHT;
+//       i++; 
+//      
+//     }
   }
 }
 
@@ -383,20 +370,34 @@ void explore() {
 
 void solve() {
 // Write your own algorithm to solve the maze using the list of moves from explore
+    int LEFT = 1;
+    int RIGHT = -1;
+    int FORWARD = 2;
+    int moves[50] = {FORWARD, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD, LEFT, FORWARD, LEFT, LEFT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD, LEFT};
     for( int i = 0; i < 50; i++){
-      if(moves[i] == RIGHT && moves[i+1] == RIGHT){
+      if(moves[i] == LEFT && moves[i+1] == LEFT){
         int temp = 0;
         i += 2;
-        while(moves[i + temp] == FORWARD || (moves[i+temp] == -moves[i- temp - 2])){
+        while(moves[i + temp] == FORWARD || (moves[i+temp] == -moves[i- temp - 3])){
           temp++;
         }
-        for (int j = i - temp - 2; j < i + temp; j++) {
+        cout << i - temp - 4 << endl;
+        if(moves[i - temp - 4] == RIGHT && moves[i + temp ] == RIGHT)
+        {
+            moves[i - temp - 4] = FORWARD;
+        }
+        for (int j = i - temp - 3; j < i + temp; j++) {
           moves[j] = 0;
         }
         i += temp;
-        moves[i] *= -1;
       }
-  }}
+    }
+        for( int i = 0; i < 50; i++){
+            cout << moves[i] << ' ';
+        }
+    cout << moves;
+    return 0;
+ }
 
 
 void runMaze() {
@@ -485,33 +486,7 @@ void update_position(){ //Updates position for localization
 }
 
 
-void moveForward(){ //what if we have it move forward until it gets an empty right or blocked straight
-  int lstart = left.count;
-  int rstart = right.count;
-  int last_time = millis() - 100;
-  int diff;
-  float sider, front;
-  do{
-    Serial.println("Moving");
-    if(millis() - last_time >= 60){
-      sider = hc.dist(0);   
-      front = readFrontDist();
-      last_time = millis();
-    }   
-    double expGain = 9.0;
 
-    diff = (right.count-rstart) - (left.count - lstart);
-    int cmdLeft = 186;
-    // cmdRight = computeCommand(GAIN_B, deadband_B, errorRight) * errorCenter + kd*(lastError - errorRight) / (thisTime- lastTime);
-    int cmdRight = 186 *  abs(expGain - diff)/ expGain;
-
-    // Set new PWMs
-    run_motor(A, cmdLeft);
-    run_motor(B, cmdRight);
-
-  }while( sider < wallTol && front > wallTol);
-  
-}
 
 void printSensorData() {
     Serial.print("lEnc: ");
@@ -519,18 +494,9 @@ void printSensorData() {
     Serial.print("\trEnc: ");
     Serial.print(left.count);
     Serial.print("\tfDist: ");
-    Serial.print(readFrontDist());
+    Serial.print(hc.dist(2));
     Serial.print("\trDist: ");
     Serial.print(hc.dist(0));
     Serial.print("\tlDist: ");
     Serial.println(hc.dist(1));
-}
-
-//With the settings above, this IRS will trigger each 500ms.
-ISR(TIMER1_COMPA_vect){
-  TCNT1  = 0;                  //First, set the timer back to 0 so it resets for next interrupt
-  sensorReadings++;
-  leftSensorSum += hc.dist(1);
-  rightSensorSum += hc.dist(0);
-  IRSensorSum += readFrontDist();
 }
