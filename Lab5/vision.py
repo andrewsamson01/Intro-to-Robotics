@@ -74,12 +74,13 @@ def main():
             rvecs, tvecs, _ = cv.aruco.estimatePoseSingleMarkers(corners=corners, markerLength=MARKER_LENGTH, cameraMatrix=K, distCoeffs=None)
             # Get the pose of the first detected marker with respect to the camera.
             print(tvecs[0])
+            M_ext = [None] * len(ids)
             
-            for i in range(0, len(rvecs)):
+            for i in ids:
                 rvec_m_c = rvecs[i]  # This is a 1x3 rotation vector
                 tm_c = tvecs[i]  # This is a 1x3 translation vector
                 rotation_m_c = cv.Rodrigues(rvec_m_c[0])  # Gets 3x3 rotation matrix from 1x3 rotation vector
-                M_ext = np.block([[rotation_m_c[0], tm_c.T]])  # Creates homography from marker to camera
+                M_ext[i] = np.block([[rotation_m_c[0], tm_c.T]])  # Creates homography from marker to camera
                 # frame = draw_pyramid(frame, M_ext, Switch[ids[0, :]], ids[0, :])  # Pass in values to draw the pyramid
                 cv.aruco.drawAxis(image=frame, cameraMatrix=K, distCoeffs=None, rvec=rvec_m_c, tvec=tm_c, length=MARKER_LENGTH / 2)
             
