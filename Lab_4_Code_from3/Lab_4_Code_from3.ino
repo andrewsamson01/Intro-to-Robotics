@@ -1,7 +1,7 @@
 /*
 John Ripple and Andrew Samson
-2/24/2023
-Lab 3: Closed Loop Control
+3/31/2023
+Lab4: Solving a Maze
 MEGN 441: Intro to Robotics
 */
 // Include Libraries
@@ -23,11 +23,6 @@ HCSR04 hc(trig, new int[3] {echoRight, echoLeft, echoFront}, 3);
 #define wallTol 13 //cm
 
 //int moves[50]; // Empty array of 50 moves, probably more than needed, just in case
-
-
-
-
-
 
 // Driver definitions
 
@@ -70,7 +65,6 @@ HCSR04 hc(trig, new int[3] {echoRight, echoLeft, echoFront}, 3);
 // You may change these as you see fit.
 #define EncoderMotorLeft  7
 #define EncoderMotorRight 8
-#define Bumper 9
 
 // Proportional Control constants
 // what are your ratios of PWM:Encoder Count error?
@@ -84,12 +78,8 @@ HCSR04 hc(trig, new int[3] {echoRight, echoLeft, echoFront}, 3);
 // May be different per motor
 #define deadband_A 100
 #define deadband_B 100
-bool bump = false;
 
-//pos
-double x = 0;
-double y = 0;
-double phi = 0;
+
 // Lab specific variables
 
 // Wheel class to store values and functions related to each wheel
@@ -137,12 +127,9 @@ void indexRightEncoderCount();
 void indexLeftEncoderCount();
 
 //Sensor Avg stuff
-int sensorReadings = 0;
-float leftSensorSum = 0;
-float rightSensorSum = 0;
-float frontSensorSum = 0;
 
-
+int compass = 0;
+int treasureMap[6][6] = {{}}; //2d Map of the Course (all initialized to 0)
 // Create the wheel objects
 wheel right(7, indexRightEncoderCount);
 wheel left(8, indexLeftEncoderCount);
@@ -153,10 +140,7 @@ void setup() {
   Serial.begin(9600);
   motor_setup();
   pinMode(pushButton, INPUT_PULLUP);
-  // add additional pinMode statements for any bump sensors
-  
 
-   // add additional pinMode statements for any bump sensors
    //GRD AND VCC FOR SENSORS AND ACTUATORS
 
   //right encoder 5v
@@ -214,7 +198,7 @@ void loop()
 //////////////////////////////// end of loop() /////////////////////////////////
 
 
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int drive(float distance, int ldir, int rdir)
 {
@@ -267,28 +251,16 @@ int drive(float distance, int ldir, int rdir)
     run_motor(A, 0);
     run_motor(B, 0);
 }
-////////////////////////////////////////////////////////
-float readFrontDist() { 
-  // If IR distance sensor
-  int reading = analogRead(A0);
-  float dist = 1/(0.1* reading * 5.0/1023 + -0.026) - 0.9;// Equation from your calibration;
-
-  // if Ultrasonic
-  // float dist = frontUS.dist(); //(returns in cm)
-
-  return dist;
-}
-
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void explore() {
   double sider, sidel,front;
   int i = 0;
   float fronttol = 10;
   double tur = 20*PI/4.0; // Arc length = r*theta ~~ 5*PI
-  int itters = 0;
-  float IrAvg = 0;
   float centimetersForward = 29;
+  int x = 0;
+  int y = 0;
   while (digitalRead(pushButton) == 1) { //while maze is not solved
     // Read distances
     //printSensorData();
@@ -296,19 +268,18 @@ void explore() {
     sidel = 0;
     front = 0;
     
-    // if(millis() - last_time >= 60){
-    for(int j = 0; j < 5; j++){
+    for(int j = 0; j < 5; j++){ //Get the average of 5 sensor values for accuracy
       sider += hc.dist(0);
       sidel += hc.dist(1);    
       last_time = millis();
       front += hc.dist(2);
       delay(60);
       Serial.print("F: ");
-    Serial.print(front);
-    Serial.print("\tR: ");
-    Serial.print(sider);
-    Serial.print("\tL: ");
-    Serial.println(sidel);
+      Serial.print(front);
+      Serial.print("\tR: ");
+      Serial.print(sider);
+      Serial.print("\tL: ");
+      Serial.println(sidel);
       
      }
      sider /= 5.0;
@@ -322,106 +293,107 @@ void explore() {
     Serial.print("\tAvgL: ");
     Serial.println(sidel);
     
-     if (sider > wallTol) {// If side is not a wall
+     if (sider > wallTol) {// If right side is not a wall turn right and move forward
        Serial.println("TurnRt");
        drive(tur * 0.9, 1,-1);
        Serial.println("ThenStraight");
        drive(centimetersForward, 1, 1);
+      
+       // Record actions
        moves[i] = RIGHT;
        moves[i+1] = FORWARD;
        i += 2;
-       
-       // turn and drive forward
-       // Record actions
+
      }
-     else if (front > fronttol || front < 2.0) {// else if front is not a wall
+     else if (front > fronttol || front < 2.0) {// else if front is not a wall go straight
        Serial.println("Strgt");
        drive(centimetersForward, 1, 1);
-       //Reverse
-//       if (front < fronttol && front > 2.0) {
-//        drive(fronttol - front, -1, -1);
-//       }
+
        // Record action
        moves[i] = FORWARD;
        i++;
-     } else {
+
+     } else { //if front and right sensors show walls turn left
        Serial.println("TurnLt");
        drive(tur ,-1,1);
-       //drive(centimetersForward, 1, 1);
+       //Record Action
        moves[i] = LEFT;
-       //moves[++i] = FORWARD;
        i++;
-       
-       // turn away from side
-       // Record action
      }
-//     else{
-//       Serial.println("AbtFce");
-//       drive(tur * 2, 1, -1);
-//       moves[i] = RIGHT;
-//       moves[++i] = RIGHT;
-//       i++; 
-//      
-//     }
   }
 }
 
-
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void solve() {
 // Write your own algorithm to solve the maze using the list of moves from explore
-    int LEFT = 1;
-    int RIGHT = -1;
-    int FORWARD = 2;
-    int moves[50] = {FORWARD, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD, LEFT, FORWARD, LEFT, LEFT, FORWARD, RIGHT, FORWARD, RIGHT, FORWARD, LEFT};
-    for( int i = 0; i < 50; i++){
-      if(moves[i] == LEFT && moves[i+1] == LEFT){
-        int temp = 0;
-        i += 2;
-        while(moves[i + temp] == FORWARD || (moves[i+temp] == -moves[i- temp - 3])){
-          temp++;
+  for(int i = 0; i < 50; i++){
+    if(moves[i] == FORWARD){
+        treasureMap[x][y] = compass; //whenever the bot physically moves to a new square it will update the direction it took in the 2d array 
+        switch(compass){    
+
+            case(0): //if facing North when moving y increments
+            y++;
+            break;
+            case(1): //if facing East when moving x increments
+            x++;
+            break;
+            case(2): //if facing South when moving y decrements
+            y--;
+            break;
+            case(3): //if facing West when moving x decrements
+            x--;
+            break;
         }
-        cout << i - temp - 4 << endl;
-        if(moves[i - temp - 4] == RIGHT && moves[i + temp ] == RIGHT)
-        {
-            moves[i - temp - 4] = FORWARD;
-        }
-        for (int j = i - temp - 3; j < i + temp; j++) {
-          moves[j] = 0;
-        }
-        i += temp;
+      }else if(moves[i] == RIGHT){ //The direction it faces is updated whenever it turns. Right turn is positive left turn is negative
+          compass = ((compass) % 4) + 1; 
+      }else if(moves[i] == LEFT){
+          if(compass ==1){
+              compass = 4;
+          }else{
+              compass--;
+          }
       }
+
     }
-        for( int i = 0; i < 50; i++){
-            cout << moves[i] << ' ';
-        }
-    cout << moves;
-    return 0;
+      treasureMap[x][y] = 5; //mark the last square with a unique number
  }
 
 
 void runMaze() {
-  int j = 0;
-  int L = 0;
-  int R = 0;
-  for (int i = 0; i < sizeof(moves)/sizeof(moves[0]); i++) { // Loop through entire moves list
-    double tur = 20*PI/4; // Arc length = r*theta ~~ 5*PI
-    if(moves[i]==LEFT){
-      double vals[] = {1.0, 1.0};
-      drive(tur *vals[L],-1,1);
-      L++;
+  int y = 0;
+  int x = 0;
+  compass = 0;
+  while{treasureMap[x][y] != 5){ //while the bot is not in the last square
+    while(treasureMap[x][y] != compass){ //when the bot is not in the correcst orientation it turns
+      
+      if(treasureMap[x][y] > compass && !(treasureMap[x][y] == 3 && compass == 0)){ //turns right
+        drive(tur, 1, -1);
+        compass = (compass + 1) % 4;
+      }else{ //turns left
+        drive(tur, -1, 1);
+        if(compass == 0){
+          compass = 3;
+        }else{
+          compass = (compass - 1) % 4;
+        }
+      } 
     }
-    else if(moves[i]==RIGHT){
-      double vals[] = {.9, .9, 0.9};
-      drive(tur * vals[R],1,-1);
-      R++;
-    }
-    else{
-      // Fill with code to drive forward
-      double vals[] = {1.0, 1.0, 0.95, 2.8, 1.8, 1.0};
-      double distance = 33 * vals[j]; // Need to change this to whatever the correct distance is
-      drive(distance,1,1);
-      j++;
+
+    drive(centimetersForward, 1, 1); //when the bot is in the correct orientation it moves to a new square
+    switch(compass){ //Determines how that movement impacts the coordinates
+      case(0):
+      y++;
+      break;
+      case(1):
+      x++;
+      break;
+      case(2):
+      y--;
+      break;
+      case(3):
+      x--;
+      break;
     }
   }
 }
@@ -454,39 +426,6 @@ void indexRightEncoderCount()
   right.changeCount();
 }
 ///////////////////////////////////////////////////////////
-void bumperContact(){
-  if (!digitalRead(Bumper)) {
-    bump = true;
-  }
-}
-
-void update_position(){ //Updates position for localization
-  double d_r = right.displacement(); //sets a constant position throughout function
-  double d_l = left.displacement();
-
-  double xOld = x;
-  double yOld = y;
-  x = cos(phi)*(d_r + d_l) / 2; //updates x postion
-  y = sin(phi)*(d_r + d_l) / 2; //updates y position
-   
-  phi = (right.count - left.count) * 2.0*PI /EncoderCountsPerRev * 8 / 19; //updates orientation
-  x = x + xOld;
-  y = y + yOld;
-
-  Serial.print("Left\t");
-  Serial.print(left.count); 
-  Serial.print("\t\tRight\t");
-  Serial.print(right.count);
-  Serial.print("\t   ");
-  Serial.print(phi);
-  Serial.print('\t');
-  Serial.print(x);
-  Serial.print('\t');
-  Serial.println(y);
-}
-
-
-
 
 void printSensorData() {
     Serial.print("lEnc: ");
