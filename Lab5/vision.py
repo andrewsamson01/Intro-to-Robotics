@@ -6,13 +6,14 @@ Aruco Detection
 
 import cv2 as cv
 import numpy as np
-from Brains import transmitToArduino
+# from Brains import transmitToArduino
 # import argparse
 # import imutils
 # import sys
 
 selected_coordinates = (0,0) #globals because we need it
 def click_event(event, x, y, flags, params):
+    global selected_coordinates
     if event == cv.EVENT_LBUTTONDOWN:
         #was clicked
         selected_coordinates = (x, y)
@@ -47,6 +48,8 @@ def main():
     cap.set(cv.CAP_PROP_FRAME_WIDTH, 1920/scale)
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, 1080/scale)
     data = np.load('camera_distort_matrices.npz')
+    user_world_coords = np.array([[0, 0, 0, 0]])
+
 
     # Camera parameters
     K = data['mtx']
@@ -60,6 +63,7 @@ def main():
         print("Cannot open camera")
         exit()
     while True:
+        user_coords = np.array([[selected_coordinates[0], selected_coordinates[1], 0, 1]]).T
         # Capture frame-by-frame
         ret, frame = cap.read()
         # if frame is read correctly ret is True
@@ -73,20 +77,25 @@ def main():
             # Get the pose of all markers in the image
             rvecs, tvecs, _ = cv.aruco.estimatePoseSingleMarkers(corners=corners, markerLength=MARKER_LENGTH, cameraMatrix=K, distCoeffs=None)
             # Get the pose of the first detected marker with respect to the camera.
-            print(tvecs[0])
+            # print(tvecs[0])
             M_ext = [None] * len(ids)
-            
-            for i in ids:
-                rvec_m_c = rvecs[i]  # This is a 1x3 rotation vector
-                tm_c = tvecs[i]  # This is a 1x3 translation vector
-                rotation_m_c = cv.Rodrigues(rvec_m_c[0])  # Gets 3x3 rotation matrix from 1x3 rotation vector
-                M_ext[i] = np.block([[rotation_m_c[0], tm_c.T]])  # Creates homography from marker to camera
-                # frame = draw_pyramid(frame, M_ext, Switch[ids[0, :]], ids[0, :])  # Pass in values to draw the pyramid
-                cv.aruco.drawAxis(image=frame, cameraMatrix=K, distCoeffs=None, rvec=rvec_m_c, tvec=tm_c, length=MARKER_LENGTH / 2)
-            
-            #use M_ext to determine location of bot relative to world. 
-            P_B_B = np.block([[0,0,1]]).T #may need to be 0,0,0,1
-            P_b_w = np.linalg.inv(M_w_c) @ M_b_c @ P_B_B
+
+            if len(ids) > 1:
+                for i in range(0, len(ids)):
+                    rvec_m_c = rvecs[i]  # This is a 1x3 rotation vector
+                    tm_c = tvecs[i]  # This is a 1x3 translation vector
+                    rotation_m_c = cv.Rodrigues(rvec_m_c[0])  # Gets 3x3 rotation matrix from 1x3 rotation vector
+                    M_ext[i] = np.block([[rotation_m_c[0], tm_c.T]])  # Creates homography from marker to camera
+                    # frame = draw_pyramid(frame, M_ext, Switch[ids[0, :]], ids[0, :])  # Pass in values to draw the pyramid
+                    cv.aruco.drawAxis(image=frame, cameraMatrix=K, distCoeffs=None, rvec=rvec_m_c, tvec=tm_c, length=MARKER_LENGTH / 2)
+
+                M_w_c = np.block([[M_ext[0]], [0, 0, 0, 1]])
+                M_b_c = np.block([[M_ext[1]], [0, 0, 0, 1]])
+                #use M_ext to determine location of bot relative to world.
+                P_B_B = np.array([[0,0,0,1]]).T
+                P_b_w = np.linalg.inv(M_w_c) @ M_b_c @ P_B_B
+                user_world_coords = np.linalg.inv(M_w_c) @ user_coords
+        print(user_world_coords)
         # Display the resulting frame
         cv.imshow('frame', frame)
 
@@ -94,7 +103,7 @@ def main():
             break
         cv.setMouseCallback('frame', click_event)
         left_pwm, right_pwm = 255, 255 #calculate pwms
-        transmitToArduino()
+        # transmitToArduino()
     # When everything done, release the capture
     cap.release()
 
