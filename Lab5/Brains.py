@@ -3,6 +3,7 @@ import time      #import time library
 import spidev
 from lib_nrf24 import NRF24   #import NRF24 library
 
+
 def transmitToArduino():
     GPIO.setmode(GPIO.BCM)       # set the gpio mode
 
