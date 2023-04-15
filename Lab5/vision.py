@@ -18,7 +18,7 @@ from Controls import calculatePWMS #Computes PWMS to transmit
 selected_coordinates = (0, 0) #globals because we need it
 
 # Set up serial communication
-ser = serial.Serial('COM6', 115200, timeout=1)
+ser = serial.Serial('COM13', 115200, timeout=1)
 ser.reset_input_buffer()
 
 
@@ -50,9 +50,9 @@ def cameraToWorld(M_ext, K):
     fx = K[0][0]
     fy = K[1][1]
     # print(Point)
-    X = ((selected_coordinates[0] - Point[0] ) * Z/fx)
-    Y = (selected_coordinates[1] - Point[1] ) * Z / fy * -1
-    return [X,Y,Z]
+    X = ((selected_coordinates[0] - Point[0]) * Z / fx)
+    Y = (selected_coordinates[1] - Point[1]) * Z / fy * -1
+    return [X, Y, Z]
 
 
 def unitVecCalc(M, K, Point=np.array([1, 0, 0, 1]).T):
@@ -74,7 +74,7 @@ def unitVecCalcWorld(M, K):
 
 def main():
     scale = 1
-    cap = cv.VideoCapture(0, cv.CAP_DSHOW)  # this is the magic!
+    cap = cv.VideoCapture(1, cv.CAP_DSHOW)  # this is the magic!
     cap.set(cv.CAP_PROP_FRAME_WIDTH, 1920/scale)
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, 1080/scale)
     data = np.load('camera_distort_matrices.npz')
@@ -110,37 +110,38 @@ def main():
             # Get the pose of the first detected marker with respect to the camera.
             # print(tvecs[0])
             cv.circle(frame, (int(1920/2), int(1080/2)), 4, (255, 0, 0))
-            M_ext = [None] * len(ids)
+            M_ext = [None] * 2
 
 
             unit_vec_bot = []
             unit_vec_world = []
-            if len(ids) > 1:
-                for i in range(0, len(ids)):
-                    rvec_m_c = rvecs[i]  # This is a 1x3 rotation vector
-                    tm_c = tvecs[i]  # This is a 1x3 translation vector
-                    rotation_m_c = cv.Rodrigues(rvec_m_c[0])  # Gets 3x3 rotation matrix from 1x3 rotation vector
-                    if ids[i] == 1:
-                        M_ext[1] = np.block([[rotation_m_c[0], tm_c.T]])  # Creates homography from marker to camera
-                    elif ids[i] == 0:
-                        M_ext[0] = np.block([[rotation_m_c[0], tm_c.T]])  # Creates homography from marker to camera
-                    # frame = draw_pyramid(frame, M_ext, Switch[ids[0, :]], ids[0, :])  # Pass in values to draw the pyramid
-                    cv.aruco.drawAxis(image=frame, cameraMatrix=K, distCoeffs=None, rvec=rvec_m_c, tvec=tm_c, length=MARKER_LENGTH / 2)
-                M_w_c = np.block([[M_ext[0]], [0, 0, 0, 1]])
+            for i in range(0, len(ids)):
+                rvec_m_c = rvecs[i]  # This is a 1x3 rotation vector
+                tm_c = tvecs[i]  # This is a 1x3 translation vector
+                rotation_m_c = cv.Rodrigues(rvec_m_c[0])  # Gets 3x3 rotation matrix from 1x3 rotation vector
+                if ids[i] == 1:
+                    M_ext[1] = np.block([[rotation_m_c[0], tm_c.T]])  # Creates homography from marker to camera
+                elif ids[i] == 0:
+                    M_ext[0] = np.block([[rotation_m_c[0], tm_c.T]])  # Creates homography from marker to camera
+                # frame = draw_pyramid(frame, M_ext, Switch[ids[0, :]], ids[0, :])  # Pass in values to draw the pyramid
+                cv.aruco.drawAxis(image=frame, cameraMatrix=K, distCoeffs=None, rvec=rvec_m_c, tvec=tm_c, length=MARKER_LENGTH / 2)
+                #M_w_c = np.block([[M_ext[0]], [0, 0, 0, 1]])
                 M_b_c = np.block([[M_ext[1]], [0, 0, 0, 1]])
                 #use M_ext to determine location of bot relative to world.
                 P_B_B = np.array([[0,0,0,1]]).T
-                P_b_w = np.linalg.inv(M_w_c) @ M_b_c @ P_B_B
-                user_world_coords = cameraToWorld(M_ext[0], K)
+                P_B_C = K @ M_ext[1] @ P_B_B
+                P_B_C = P_B_C / P_B_C[2]
+                # P_b_w = np.linalg.inv(M_w_c) @ M_b_c @ P_B_B
+                #user_world_coords = cameraToWorld(M_ext[0], K)
                 unit_vec_bot = unitVecCalc(M_ext[1], K)
                 unit_vec_world = unitVecCalcWorld(M_ext[1], K)
                 angle = np.math.atan2(np.linalg.det([unit_vec_world[0:2] , unit_vec_bot[0:2]]),np.dot(unit_vec_world, unit_vec_bot))
-
-                # cv.circle(frame, (int(user_world_coords[0]), int(user_world_coords[1])), 4, (0, 255, 0))
+                # print(user_world_coords)
+                cv.circle(frame, (int(selected_coordinates[0]), int(selected_coordinates[1])), 4, (0, 255, 0))
                 # print(angle)
-                lPWM, rPWM = calculatePWMS( P_b_w[0], P_b_w[1], angle, user_world_coords[0], user_world_coords[1])
+                lPWM, rPWM = calculatePWMS( P_B_C[0], P_B_C[1], angle, selected_coordinates[0], selected_coordinates[1])
                 serialSend([lPWM, rPWM])
-                # print()
+                #print()
         #print(user_world_coords)
         # Display the resulting frame
         cv.imshow('frame', frame)
@@ -154,6 +155,8 @@ def main():
     # When everything done, release the capture
     cap.release()
 
-main()
-
+try:
+    main()
+except:
+    serialSend([0, 0])
 

@@ -3,15 +3,16 @@ import numpy as np
 def calculatePWMS(x, y, w, xp, yp):
     '''Takes in the x, y , and w of the robot as well as the xp and yp of the selected point
     all relative to the world returns the left PWM and right PWM'''
-    angle_tolerance = math.pi / 12
-    distance_tolerance = 4
+    angle_tolerance = math.pi / 10
+    distance_tolerance = 35
     vector = [xp - x, yp - y]
-    print(w)
     # polar_vector = [math.sqrt(vector[0]**2 + vector[1] **2), math.atan2(vector[1], vector[0])]
     distance = math.sqrt(vector[0]**2 + vector[1] **2)
+    print(distance)
+    # if distance > distance_tolerance:
     if abs(w) > angle_tolerance:
         angle_error = w
-        return drive(angle_error , np.sign(angle_error), np.sign(angle_error))
+        return drive(angle_error*10 , np.sign(angle_error), np.sign(angle_error))
     elif distance > distance_tolerance:
         return drive(distance, 1, -1)
     return 0, 0
