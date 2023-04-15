@@ -64,13 +64,13 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/vision.py</url>
-          <line>42</line>
-          <option name="timeStamp" value="3" />
+          <line>35</line>
+          <option name="timeStamp" value="12" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/vision.py</url>
-          <line>86</line>
-          <option name="timeStamp" value="4" />
+          <line>67</line>
+          <option name="timeStamp" value="14" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

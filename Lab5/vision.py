@@ -7,6 +7,7 @@ Aruco Detection
 import cv2 as cv  
 
 import numpy as np
+import serial
 from Controls import calculatePWMS #Computes PWMS to transmit
 
 # from Brains import transmitToArduino
@@ -15,6 +16,17 @@ from Controls import calculatePWMS #Computes PWMS to transmit
 # import sys
 
 selected_coordinates = (0, 0) #globals because we need it
+
+# Set up serial communication
+ser = serial.Serial('COM6', 115200, timeout=1)
+ser.reset_input_buffer()
+
+
+def serialSend(PWM):
+    s = " ".join(map(str, PWM)) + " \n"
+    ser.write(s.encode('utf-8'))
+    line = ser.readline().decode('utf-8').rstrip()
+    print(line)
 
 
 def click_event(event, x, y, flags, params):
@@ -41,6 +53,23 @@ def cameraToWorld(M_ext, K):
     X = ((selected_coordinates[0] - Point[0] ) * Z/fx)
     Y = (selected_coordinates[1] - Point[1] ) * Z / fy * -1
     return [X,Y,Z]
+
+
+def unitVecCalc(M, K, Point=np.array([1, 0, 0, 1]).T):
+    camera_Point_x = K @ M @ Point
+    camera_Point_x = camera_Point_x / camera_Point_x[2]
+    camera_Point_origin = K @ M @ np.array([0, 0, 0, 1]).T
+    camera_Point_origin = camera_Point_origin / camera_Point_origin[2]
+    unit_vec = camera_Point_x - camera_Point_origin
+    return unit_vec / np.linalg.norm(unit_vec)
+
+
+def unitVecCalcWorld(M, K):
+    camera_Point_x = [selected_coordinates[0], selected_coordinates[1], 1]
+    camera_Point_origin = K @ M @ np.array([0, 0, 0, 1]).T
+    camera_Point_origin = camera_Point_origin / camera_Point_origin[2]
+    unit_vec = camera_Point_x - camera_Point_origin
+    return unit_vec / np.linalg.norm(unit_vec)
 
 
 def main():
@@ -83,6 +112,9 @@ def main():
             cv.circle(frame, (int(1920/2), int(1080/2)), 4, (255, 0, 0))
             M_ext = [None] * len(ids)
 
+
+            unit_vec_bot = []
+            unit_vec_world = []
             if len(ids) > 1:
                 for i in range(0, len(ids)):
                     rvec_m_c = rvecs[i]  # This is a 1x3 rotation vector
@@ -100,10 +132,15 @@ def main():
                 P_B_B = np.array([[0,0,0,1]]).T
                 P_b_w = np.linalg.inv(M_w_c) @ M_b_c @ P_B_B
                 user_world_coords = cameraToWorld(M_ext[0], K)
+                unit_vec_bot = unitVecCalc(M_ext[1], K)
+                unit_vec_world = unitVecCalcWorld(M_ext[1], K)
+                angle = np.math.atan2(np.linalg.det([unit_vec_world[0:2] , unit_vec_bot[0:2]]),np.dot(unit_vec_world, unit_vec_bot))
+
                 # cv.circle(frame, (int(user_world_coords[0]), int(user_world_coords[1])), 4, (0, 255, 0))
-                # print(P_b_w)
+                # print(angle)
+                lPWM, rPWM = calculatePWMS( P_b_w[0], P_b_w[1], angle, user_world_coords[0], user_world_coords[1])
+                serialSend([lPWM, rPWM])
                 # print()
-          #  print(user_coords)
         #print(user_world_coords)
         # Display the resulting frame
         cv.imshow('frame', frame)
@@ -118,3 +155,5 @@ def main():
     cap.release()
 
 main()
+
+
