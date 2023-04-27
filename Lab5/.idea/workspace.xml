@@ -2,8 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e397b6bd-6117-4327-8a0b-55ab7256e581" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/Lab5.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Lab5.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.name" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.name" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Controls.py" beforeDir="false" afterPath="$PROJECT_DIR$/Controls.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/vision.py" beforeDir="false" afterPath="$PROJECT_DIR$/vision.py" afterDir="false" />
@@ -27,7 +26,7 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
-    "Project.color": "4f5e50",
+    "Project.color": "3a0016",
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "last_opened_file_path": "C:/Users/rippl/Desktop/Intro-to-Robotics/Lab5/Calib_Pics",

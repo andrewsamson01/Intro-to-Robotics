@@ -4,12 +4,13 @@ def calculatePWMS(x, y, w, xp, yp):
     '''Takes in the x, y , and w of the robot as well as the xp and yp of the selected point
     all relative to the world returns the left PWM and right PWM'''
     angle_tolerance = math.pi / 10
-    distance_tolerance = 35
+    distance_tolerance = 10
     vector = [xp - x, yp - y]
     # polar_vector = [math.sqrt(vector[0]**2 + vector[1] **2), math.atan2(vector[1], vector[0])]
     distance = math.sqrt(vector[0]**2 + vector[1] **2)
     print(distance)
-    # if distance > distance_tolerance:
+    if distance < distance_tolerance:
+        return 0, 0
     if abs(w) > angle_tolerance:
         angle_error = w
         return drive(angle_error*10 , np.sign(angle_error), np.sign(angle_error))
