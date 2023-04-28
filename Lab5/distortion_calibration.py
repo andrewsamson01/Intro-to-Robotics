@@ -1,3 +1,9 @@
+"""
+John Ripple
+Distortion Camera Calibration code
+3/20/2022
+"""
+
 import numpy as np
 import cv2 as cv
 import glob
