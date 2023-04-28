@@ -9,16 +9,17 @@ def calculatePWMS(x, y, w, xp, yp):
     # polar_vector = [math.sqrt(vector[0]**2 + vector[1] **2), math.atan2(vector[1], vector[0])]
     distance = math.sqrt(vector[0]**2 + vector[1] **2)
     print(distance)
-    if distance < distance_tolerance:
+    if distance < distance_tolerance: # If within the distance tolerance it is good enough
         return 0, 0
-    if abs(w) > angle_tolerance:
+    if abs(w) > angle_tolerance: #Turn towards the point
         angle_error = w
         return drive(angle_error*10 , np.sign(angle_error), np.sign(angle_error))
-    elif distance > distance_tolerance:
+    elif distance > distance_tolerance:#Drive towards the point
         return drive(distance, 1, -1)
     return 0, 0
 
 def drive(distance, ldir, rdir):
+    #A place that allows for the gain and deadband of each motor to be changed if needed. Also Determines direction of motors
     GAIN_A = 3
     GAIN_B = 3
     deadband_A = 100
@@ -30,6 +31,7 @@ def drive(distance, ldir, rdir):
     return leftPWM, rightPWM
 
 def computeCommand(gain, deadband, error):
+    #P Controler taht determines the PWM that based on the gain, error and deadband
     maxPWM = 220
     cmdDir = (gain * error) # Proportional control 
     cmdDir = max([deadband, min([cmdDir, maxPWM])]) # Bind value between motor's min and max
