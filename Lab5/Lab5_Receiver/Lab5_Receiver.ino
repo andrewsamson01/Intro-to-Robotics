@@ -52,14 +52,14 @@ void loop() {
     int arrayOfInputs[2] = {0};
     for(int i = 0; i < data.length(); i++){
       if(data[i] == ' ') {
-        arrayOfInputs[count] = data.substring(start, i).toInt();
+        arrayOfInputs[count] = data.substring(start, i).toInt();  //Get signal and convert to integers
         start = i;
         count++;
       }
     }
     Serial.println(arrayOfInputs[0]);
     Serial.println(arrayOfInputs[1]);
-    run_motor(A, arrayOfInputs[0]);
+    run_motor(A, arrayOfInputs[0]); //Run the Motors
     run_motor(B, arrayOfInputs[1]);
     Serial.println("Turning off the radio.") ;   // print message on serial monitor
     radio.stopListening() ;   // stop listening radio
