@@ -1,3 +1,4 @@
+//This code Transmits data across wifi to be recieved by the other arduino via the serial connection
 #include <SPI.h>
 #include <nRF24L01.h>
 #include <RF24.h>
@@ -16,7 +17,7 @@ void setup() {
 }
 
 void loop() {
-    if (Serial.available() > 0) {
+    if (Serial.available() > 0) { //If We have new data, interpret and send it
     receiveData();
   }
 
@@ -31,14 +32,14 @@ void receiveData() {
   Serial.print("You Sent me: ");
   for(int i = 0; i < data.length(); i++){
     if(data[i] == ' ') {
-      arrayOfInputs[count] = data.substring(start, i).toInt();
+      arrayOfInputs[count] = data.substring(start, i).toInt(); //Converts the string that is read in into an integer
       start = i;
       count++;
     }
   }
   char text[data.length() + 1];
-  data.toCharArray(text, data.length()+1);
-  radio.write(&text, sizeof(text)); 
+  data.toCharArray(text, data.length()+1); //Converts the int into something compatable with the library: a character array
+  radio.write(&text, sizeof(text)); //Ships that signal out for the robot to recieve
 
   Serial.println(data); 
 }
